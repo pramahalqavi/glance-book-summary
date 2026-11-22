@@ -222,12 +222,12 @@ export function HomePage() {
 
       {/* Catalog Grid */}
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5">
           {Array.from({ length: 4 }).map((_, i) => (
             <div
               key={i}
               style={{ backgroundColor: 'var(--reader-surface-muted)' }}
-              className="h-96 rounded-2xl animate-pulse"
+              className="h-72 sm:h-96 rounded-2xl animate-pulse"
             />
           ))}
         </div>
@@ -266,7 +266,7 @@ export function HomePage() {
         </div>
       ) : (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5">
             {visibleBooks.map((book) => (
               <BookCard key={book.id} book={book} />
             ))}
