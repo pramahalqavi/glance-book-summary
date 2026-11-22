@@ -80,16 +80,24 @@ export function ReaderPage() {
     };
   }, [bookId]);
 
-  // Sync URL query param & persist reading progress
+  // Sync URL query param ONLY when chapter changes
   useEffect(() => {
     if (!bookId || !summary) return;
     setSearchParams({ chapter: String(chapterIndex) }, { replace: true });
-    updateProgress(bookId, {
-      chapterIndex,
-      pageIndex,
-      scrollRatio,
-    });
-  }, [bookId, summary, chapterIndex, pageIndex, scrollRatio, setSearchParams, updateProgress]);
+  }, [bookId, summary, chapterIndex, setSearchParams]);
+
+  // Persist chapter & page immediately; debounce scrollRatio writes so scrolling stays 60fps
+  useEffect(() => {
+    if (!bookId || !summary) return;
+    const timer = window.setTimeout(() => {
+      updateProgress(bookId, {
+        chapterIndex,
+        pageIndex,
+        scrollRatio,
+      });
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [bookId, summary, chapterIndex, pageIndex, scrollRatio, updateProgress]);
 
   const chapterCount = summary?.chapters.length ?? 0;
   const currentChapter = summary?.chapters[chapterIndex] ?? null;

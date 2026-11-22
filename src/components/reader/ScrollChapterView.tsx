@@ -56,28 +56,45 @@ export function ScrollChapterView({
   });
 
   const wheelLockRef = useRef<number>(0);
+  const initialScrollRatioRef = useRef(initialScrollRatio);
+  const lastReportedRatioRef = useRef(-1);
+  const scrollRafRef = useRef<number | null>(null);
 
-  // Restore scroll position on chapter mount
+  // Restore scroll position ONLY when switching chapters (never fight active user scrolling)
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    if (initialScrollRatio > 0.02) {
+    const targetRatio = initialScrollRatioRef.current;
+    if (targetRatio > 0.02) {
       const maxScroll = Math.max(0, el.scrollHeight - el.clientHeight);
-      el.scrollTop = maxScroll * initialScrollRatio;
+      el.scrollTop = maxScroll * targetRatio;
     } else {
       el.scrollTop = 0;
     }
-  }, [chapter.index, initialScrollRatio]);
+  }, [chapter.index]);
+
+  useEffect(() => {
+    return () => {
+      if (scrollRafRef.current !== null) {
+        cancelAnimationFrame(scrollRafRef.current);
+      }
+    };
+  }, []);
 
   const handleScroll = () => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const maxScroll = el.scrollHeight - el.clientHeight;
-    if (maxScroll <= 0) {
-      onScrollRatioChange(1);
-      return;
-    }
-    onScrollRatioChange(Math.max(0, Math.min(1, el.scrollTop / maxScroll)));
+    if (scrollRafRef.current !== null) return;
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = null;
+      const el = scrollRef.current;
+      if (!el) return;
+      const maxScroll = el.scrollHeight - el.clientHeight;
+      const ratio = maxScroll <= 0 ? 1 : Math.max(0, Math.min(1, el.scrollTop / maxScroll));
+      // Only notify parent when progress moves noticeably (>= 1%)
+      if (Math.abs(ratio - lastReportedRatioRef.current) >= 0.01 || ratio === 0 || ratio === 1) {
+        lastReportedRatioRef.current = ratio;
+        onScrollRatioChange(ratio);
+      }
+    });
   };
 
   // Touch handlers with gesture disambiguation (PRD §6)
