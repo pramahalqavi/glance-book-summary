@@ -1,14 +1,17 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Fuse from 'fuse.js';
-import { ArrowRight, BookOpen, Search, X } from 'lucide-react';
+import { ArrowRight, BookOpen, ChevronDown, Search, X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { BookCard } from '../components/BookCard';
+
+const PAGE_SIZE = 20;
 
 export function HomePage() {
   const { books, loading, continueReadingBooks } = useApp();
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const categories = useMemo(() => {
     const set = new Set<string>();
@@ -37,6 +40,17 @@ export function HomePage() {
     if (selectedCategory === 'All') return base;
     return base.filter((b) => b.categories.includes(selectedCategory));
   }, [books, fuse, query, selectedCategory]);
+
+  // Reset pagination whenever search query or category changes
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [query, selectedCategory]);
+
+  const visibleBooks = useMemo(
+    () => filteredBooks.slice(0, visibleCount),
+    [filteredBooks, visibleCount]
+  );
+  const remainingCount = filteredBooks.length - visibleBooks.length;
 
   return (
     <div className="space-y-8">
@@ -234,10 +248,35 @@ export function HomePage() {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {filteredBooks.map((book) => (
-            <BookCard key={book.id} book={book} />
-          ))}
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            {visibleBooks.map((book) => (
+              <BookCard key={book.id} book={book} />
+            ))}
+          </div>
+
+          {remainingCount > 0 && (
+            <div className="flex flex-col items-center gap-2 pt-2">
+              <p style={{ color: 'var(--reader-muted)' }} className="text-xs font-medium">
+                Showing {visibleBooks.length} of {filteredBooks.length} summaries
+              </p>
+              <button
+                type="button"
+                onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                style={{
+                  backgroundColor: 'var(--reader-surface)',
+                  borderColor: 'var(--reader-border)',
+                  color: 'var(--reader-text)',
+                }}
+                className="min-h-[44px] px-6 rounded-full border text-sm font-semibold inline-flex items-center gap-2 shadow-2xs hover:shadow-xs transition-all cursor-pointer"
+              >
+                <span>
+                  Load {Math.min(PAGE_SIZE, remainingCount)} More
+                </span>
+                <ChevronDown className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

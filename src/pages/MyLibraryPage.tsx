@@ -1,14 +1,17 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Bookmark, CheckCircle2, Clock } from 'lucide-react';
+import { Bookmark, CheckCircle2, ChevronDown, Clock } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { BookCard } from '../components/BookCard';
 
 type LibraryTab = 'saved' | 'in-progress' | 'finished';
 
+const PAGE_SIZE = 20;
+
 export function MyLibraryPage() {
   const { books, bookmarks, progressMap } = useApp();
   const [tab, setTab] = useState<LibraryTab>('saved');
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const savedBooks = useMemo(
     () => books.filter((b) => bookmarks.includes(b.id)),
@@ -39,6 +42,16 @@ export function MyLibraryPage() {
       : tab === 'in-progress'
       ? inProgressBooks
       : finishedBooks;
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [tab]);
+
+  const visibleBooks = useMemo(
+    () => activeList.slice(0, visibleCount),
+    [activeList, visibleCount]
+  );
+  const remainingCount = activeList.length - visibleBooks.length;
 
   const tabs: Array<{ id: LibraryTab; label: string; count: number; icon: typeof Bookmark }> = [
     { id: 'saved', label: 'Saved', count: savedBooks.length, icon: Bookmark },
@@ -134,10 +147,35 @@ export function MyLibraryPage() {
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {activeList.map((book) => (
-            <BookCard key={book.id} book={book} />
-          ))}
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            {visibleBooks.map((book) => (
+              <BookCard key={book.id} book={book} />
+            ))}
+          </div>
+
+          {remainingCount > 0 && (
+            <div className="flex flex-col items-center gap-2 pt-2">
+              <p style={{ color: 'var(--reader-muted)' }} className="text-xs font-medium">
+                Showing {visibleBooks.length} of {activeList.length} summaries
+              </p>
+              <button
+                type="button"
+                onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                style={{
+                  backgroundColor: 'var(--reader-surface)',
+                  borderColor: 'var(--reader-border)',
+                  color: 'var(--reader-text)',
+                }}
+                className="min-h-[44px] px-6 rounded-full border text-sm font-semibold inline-flex items-center gap-2 shadow-2xs hover:shadow-xs transition-all cursor-pointer"
+              >
+                <span>
+                  Load {Math.min(PAGE_SIZE, remainingCount)} More
+                </span>
+                <ChevronDown className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
