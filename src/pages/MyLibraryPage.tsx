@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Bookmark, CheckCircle2, ChevronDown, Clock } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { BookCard } from '../components/BookCard';
+import { SortDropdown, sortBooks, type BookSortOption } from '../components/SortDropdown';
 
 type LibraryTab = 'saved' | 'in-progress' | 'finished';
 
@@ -11,6 +12,7 @@ const PAGE_SIZE = 20;
 export function MyLibraryPage() {
   const { books, bookmarks, progressMap } = useApp();
   const [tab, setTab] = useState<LibraryTab>('saved');
+  const [sortBy, setSortBy] = useState<BookSortOption>('default');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const savedBooks = useMemo(
@@ -36,16 +38,19 @@ export function MyLibraryPage() {
     [books, progressMap]
   );
 
-  const activeList =
-    tab === 'saved'
-      ? savedBooks
-      : tab === 'in-progress'
-      ? inProgressBooks
-      : finishedBooks;
+  const activeList = useMemo(() => {
+    const raw =
+      tab === 'saved'
+        ? savedBooks
+        : tab === 'in-progress'
+        ? inProgressBooks
+        : finishedBooks;
+    return sortBooks(raw, sortBy);
+  }, [tab, savedBooks, inProgressBooks, finishedBooks, sortBy]);
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [tab]);
+  }, [tab, sortBy]);
 
   const visibleBooks = useMemo(
     () => activeList.slice(0, visibleCount),
@@ -60,7 +65,7 @@ export function MyLibraryPage() {
   ];
 
   return (
-    <div className="space-y-6 w-full max-w-full overflow-x-hidden">
+    <div className="space-y-6 w-full max-w-full">
       <div>
         <h1 className="font-serif-editorial text-3xl sm:text-4xl font-bold tracking-tight">
           My Library
@@ -70,43 +75,49 @@ export function MyLibraryPage() {
         </p>
       </div>
 
-      {/* Responsive Tabs that fit 100% of mobile screen width */}
-      <div
-        style={{
-          backgroundColor: 'var(--reader-surface-muted)',
-          borderColor: 'var(--reader-border)',
-        }}
-        className="grid grid-cols-3 sm:inline-flex w-full sm:w-auto p-1 rounded-2xl sm:rounded-full border gap-1"
-      >
-        {tabs.map(({ id, label, count, icon: Icon }) => {
-          const active = tab === id;
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setTab(id)}
-              style={{
-                backgroundColor: active ? 'var(--reader-surface)' : 'transparent',
-                color: active ? 'var(--reader-text)' : 'var(--reader-muted)',
-              }}
-              className={`min-h-[42px] px-2.5 sm:px-4 rounded-xl sm:rounded-full text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 sm:gap-2 transition-all cursor-pointer ${
-                active ? 'shadow-2xs font-semibold' : ''
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-              <span className="truncate">{label}</span>
-              <span
+      {/* Responsive Tabs + Sort Dropdown */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div
+          style={{
+            backgroundColor: 'var(--reader-surface-muted)',
+            borderColor: 'var(--reader-border)',
+          }}
+          className="grid grid-cols-3 sm:inline-flex w-full sm:w-auto p-1 rounded-2xl sm:rounded-full border gap-1"
+        >
+          {tabs.map(({ id, label, count, icon: Icon }) => {
+            const active = tab === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setTab(id)}
                 style={{
-                  backgroundColor: active ? 'var(--reader-accent)' : 'var(--reader-border)',
-                  color: active ? '#ffffff' : 'var(--reader-text)',
+                  backgroundColor: active ? 'var(--reader-surface)' : 'transparent',
+                  color: active ? 'var(--reader-text)' : 'var(--reader-muted)',
                 }}
-                className="text-[11px] px-1.5 py-0.5 rounded-full font-semibold shrink-0"
+                className={`min-h-[42px] px-2.5 sm:px-4 rounded-xl sm:rounded-full text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 sm:gap-2 transition-all cursor-pointer ${
+                  active ? 'shadow-2xs font-semibold' : ''
+                }`}
               >
-                {count}
-              </span>
-            </button>
-          );
-        })}
+                <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                <span className="truncate">{label}</span>
+                <span
+                  style={{
+                    backgroundColor: active ? 'var(--reader-accent)' : 'var(--reader-border)',
+                    color: active ? '#ffffff' : 'var(--reader-text)',
+                  }}
+                  className="text-[11px] px-1.5 py-0.5 rounded-full font-semibold shrink-0"
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex justify-end">
+          <SortDropdown value={sortBy} onChange={setSortBy} />
+        </div>
       </div>
 
       {activeList.length === 0 ? (

@@ -5,6 +5,7 @@ import { ArrowRight, BookOpen, ChevronDown, Search, X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { BookCard } from '../components/BookCard';
 import { HorizontalScroller } from '../components/HorizontalScroller';
+import { SortDropdown, sortBooks, type BookSortOption } from '../components/SortDropdown';
 
 const PAGE_SIZE = 20;
 
@@ -12,6 +13,7 @@ export function HomePage() {
   const { books, loading, continueReadingBooks } = useApp();
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [sortBy, setSortBy] = useState<BookSortOption>('default');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const categories = useMemo(() => {
@@ -38,14 +40,17 @@ export function HomePage() {
   const filteredBooks = useMemo(() => {
     const trimmed = query.trim();
     const base = trimmed ? fuse.search(trimmed).map((r) => r.item) : books;
-    if (selectedCategory === 'All') return base;
-    return base.filter((b) => b.categories.includes(selectedCategory));
-  }, [books, fuse, query, selectedCategory]);
+    const byCategory =
+      selectedCategory === 'All'
+        ? base
+        : base.filter((b) => b.categories.includes(selectedCategory));
+    return sortBooks(byCategory, sortBy);
+  }, [books, fuse, query, selectedCategory, sortBy]);
 
-  // Reset pagination whenever search query or category changes
+  // Reset pagination whenever search query, category, or sort changes
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [query, selectedCategory]);
+  }, [query, selectedCategory, sortBy]);
 
   const visibleBooks = useMemo(
     () => filteredBooks.slice(0, visibleCount),
@@ -143,40 +148,44 @@ export function HomePage() {
               Explore Summaries
             </h1>
             <p style={{ color: 'var(--reader-muted)' }} className="text-sm sm:text-base mt-1">
-              Key insights from essential books, crafted for Scroll or Swipe reading.
+              Key insights from essential books.
             </p>
           </div>
 
-          {/* Search Input */}
-          <div className="relative w-full sm:w-80">
-            <Search
-              style={{ color: 'var(--reader-muted)' }}
-              className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
-            />
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search title, author, or topic..."
-              aria-label="Search book summaries"
-              style={{
-                backgroundColor: 'var(--reader-surface)',
-                borderColor: 'var(--reader-border)',
-                color: 'var(--reader-text)',
-              }}
-              className="w-full h-11 pl-10 pr-10 rounded-full border text-sm placeholder:opacity-60 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 transition-all shadow-2xs"
-            />
-            {query && (
-              <button
-                type="button"
-                onClick={() => setQuery('')}
-                aria-label="Clear search"
+          {/* Search Input + Sort Dropdown */}
+          <div className="flex items-center gap-2.5 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-72">
+              <Search
                 style={{ color: 'var(--reader-muted)' }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center hover:opacity-100 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
+                className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+              />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search title, author, or topic..."
+                aria-label="Search book summaries"
+                style={{
+                  backgroundColor: 'var(--reader-surface)',
+                  borderColor: 'var(--reader-border)',
+                  color: 'var(--reader-text)',
+                }}
+                className="w-full h-11 pl-10 pr-10 rounded-full border text-sm placeholder:opacity-60 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 transition-all shadow-2xs"
+              />
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => setQuery('')}
+                  aria-label="Clear search"
+                  style={{ color: 'var(--reader-muted)' }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center hover:opacity-100 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            <SortDropdown value={sortBy} onChange={setSortBy} />
           </div>
         </div>
 
