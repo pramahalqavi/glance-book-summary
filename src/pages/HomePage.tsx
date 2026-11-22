@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Fuse from 'fuse.js';
-import { ArrowRight, BookOpen, ChevronDown, Search, X } from 'lucide-react';
+import { ArrowRight, BookOpen, ChevronDown, ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { BookCard } from '../components/BookCard';
 
@@ -12,6 +12,9 @@ export function HomePage() {
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const categoryScrollRef = useRef<HTMLDivElement | null>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
 
   const categories = useMemo(() => {
     const set = new Set<string>();
@@ -51,6 +54,45 @@ export function HomePage() {
     [filteredBooks, visibleCount]
   );
   const remainingCount = filteredBooks.length - visibleBooks.length;
+
+  const updateCategoryScrollButtons = useCallback(() => {
+    const el = categoryScrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 4);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    const el = categoryScrollRef.current;
+    if (!el) return;
+    updateCategoryScrollButtons();
+
+    const observer = new ResizeObserver(() => updateCategoryScrollButtons());
+    observer.observe(el);
+
+    const onWheel = (e: WheelEvent) => {
+      if (el.scrollWidth <= el.clientWidth) return;
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        e.preventDefault();
+        el.scrollLeft += e.deltaY;
+      }
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      observer.disconnect();
+      el.removeEventListener('wheel', onWheel);
+    };
+  }, [categories, updateCategoryScrollButtons]);
+
+  const scrollCategories = (direction: 'left' | 'right') => {
+    const el = categoryScrollRef.current;
+    if (!el) return;
+    el.scrollBy({
+      left: direction === 'left' ? -240 : 240,
+      behavior: 'smooth',
+    });
+  };
 
   return (
     <div className="space-y-8">
@@ -174,32 +216,82 @@ export function HomePage() {
           </div>
         </div>
 
-        {/* Category Filter Pills */}
-        <div
-          role="tablist"
-          aria-label="Filter by category"
-          className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1"
-        >
-          {categories.map((cat) => {
-            const active = selectedCategory === cat;
-            return (
+        {/* Category Filter Pills with Desktop Left/Right Arrows & Mouse-Wheel Scroll */}
+        <div className="relative group/cats">
+          {canScrollLeft && (
+            <div
+              style={{
+                background: 'linear-gradient(to right, var(--reader-bg) 55%, transparent)',
+              }}
+              className="hidden sm:flex items-center absolute left-0 top-0 bottom-1 pr-5 z-10 pointer-events-none"
+            >
               <button
-                key={cat}
                 type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => setSelectedCategory(cat)}
+                onClick={() => scrollCategories('left')}
+                aria-label="Scroll categories left"
                 style={{
-                  backgroundColor: active ? 'var(--reader-accent)' : 'var(--reader-surface)',
-                  borderColor: active ? 'var(--reader-accent)' : 'var(--reader-border)',
-                  color: active ? '#ffffff' : 'var(--reader-muted)',
+                  backgroundColor: 'var(--reader-surface)',
+                  borderColor: 'var(--reader-border)',
+                  color: 'var(--reader-text)',
                 }}
-                className="shrink-0 min-h-[40px] px-4 rounded-full border text-sm font-medium transition-all cursor-pointer"
+                className="pointer-events-auto w-9 h-9 rounded-full border shadow-sm flex items-center justify-center hover:scale-105 transition-transform cursor-pointer"
               >
-                {cat}
+                <ChevronLeft className="w-4 h-4" />
               </button>
-            );
-          })}
+            </div>
+          )}
+
+          <div
+            ref={categoryScrollRef}
+            onScroll={updateCategoryScrollButtons}
+            role="tablist"
+            aria-label="Filter by category"
+            className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 scroll-smooth"
+          >
+            {categories.map((cat) => {
+              const active = selectedCategory === cat;
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setSelectedCategory(cat)}
+                  style={{
+                    backgroundColor: active ? 'var(--reader-accent)' : 'var(--reader-surface)',
+                    borderColor: active ? 'var(--reader-accent)' : 'var(--reader-border)',
+                    color: active ? '#ffffff' : 'var(--reader-muted)',
+                  }}
+                  className="shrink-0 min-h-[40px] px-4 rounded-full border text-sm font-medium transition-all cursor-pointer"
+                >
+                  {cat}
+                </button>
+              );
+            })}
+          </div>
+
+          {canScrollRight && (
+            <div
+              style={{
+                background: 'linear-gradient(to left, var(--reader-bg) 55%, transparent)',
+              }}
+              className="hidden sm:flex items-center justify-end absolute right-0 top-0 bottom-1 pl-5 z-10 pointer-events-none"
+            >
+              <button
+                type="button"
+                onClick={() => scrollCategories('right')}
+                aria-label="Scroll categories right"
+                style={{
+                  backgroundColor: 'var(--reader-surface)',
+                  borderColor: 'var(--reader-border)',
+                  color: 'var(--reader-text)',
+                }}
+                className="pointer-events-auto w-9 h-9 rounded-full border shadow-sm flex items-center justify-center hover:scale-105 transition-transform cursor-pointer"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
