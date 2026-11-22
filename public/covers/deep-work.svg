@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 560">
+  <defs>
+    <linearGradient id="g3" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#0e7490"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="560" fill="url(#g3)"/>
+  <path d="M40 240 Q200 130 360 240" fill="none" stroke="#22d3ee" stroke-width="4" opacity="0.7"/>
+  <path d="M40 280 Q200 170 360 280" fill="none" stroke="#67e8f9" stroke-width="3" opacity="0.5"/>
+  <path d="M40 320 Q200 210 360 320" fill="none" stroke="#a5f3fc" stroke-width="2" opacity="0.35"/>
+  <circle cx="200" cy="185" r="28" fill="#f8fafc" opacity="0.9"/>
+  <text x="36" y="425" fill="#f0f9ff" font-family="Georgia, serif" font-size="38" font-weight="700">Deep</text>
+  <text x="36" y="467" fill="#f0f9ff" font-family="Georgia, serif" font-size="38" font-weight="700">Work</text>
+  <text x="36" y="512" fill="#bae6fd" font-family="system-ui, sans-serif" font-size="16" font-weight="600" letter-spacing="2">CAL NEWPORT</text>
+</svg>

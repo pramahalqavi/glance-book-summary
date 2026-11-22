@@ -1,0 +1,192 @@
+[
+  {
+    "id": "atomic-habits",
+    "title": "Atomic Habits",
+    "author": "James Clear",
+    "coverUrl": "/covers/atomic-habits.svg",
+    "categories": ["Productivity", "Psychology"],
+    "readTimeMinutes": 14,
+    "tagline": "Tiny changes, remarkable results.",
+    "overview": "James Clear distills decades of behavioral psychology and neuroscience into a practical four-step framework for building good habits and breaking bad ones. Rather than chasing massive overnight transformations, Atomic Habits proves that tiny, 1% daily improvements compound into extraordinary outcomes when backed by well-designed systems.",
+    "keyTakeaways": [
+      "Improving by just 1% every day makes you 37 times better over the course of a year.",
+      "Forget about setting goals alone—focus on designing repeatable systems.",
+      "True behavior change is identity change: every action is a vote for the type of person you wish to become.",
+      "Every habit follows a four-step loop: Cue, Craving, Response, and Reward."
+    ],
+    "chapters": [
+      {
+        "index": 0,
+        "title": "The Surprising Power of Atomic Habits",
+        "contentMarkdown": "## Why Tiny Improvements Compound\n\nIt is easy to overestimate the importance of one defining moment and underestimate the value of making small improvements on a daily basis. Too often, we convince ourselves that massive success requires massive action.\n\nYet improving by just **1 percent** isn't particularly notable—sometimes it isn't even noticeable—but it can be far more meaningful in the long run. If you get 1% better each day for one year, you'll end up **37 times better** by the time you're done.\n\n> Habits are the compound interest of self-improvement. The same way that money multiplies through compound interest, the effects of your habits multiply as you repeat them.\n\n### The Plateau of Latent Potential\n\nWe often expect progress to be linear. In reality, the outcomes of our efforts are delayed. It is not until months or years later that we realize the true value of the previous work we have done.\n\nImagine an ice cube sitting on a table in a cold room at 25 degrees. You heat the room to 26, 27, 28, 29, 30, 31 degrees—still nothing happens. Then at **32 degrees**, the ice begins to melt. The breakthrough wasn't caused by the last degree; it was stored up by all the prior work.\n\n### Forget Goals, Focus on Systems\n\n- **Goals** are about the results you want to achieve.\n- **Systems** are about the processes that lead to those results.\n- Winners and losers often have the exact same goals; what separates them is the system of continuous small improvements.\n\nYou do not rise to the level of your goals. You fall to the level of your systems."
+      },
+      {
+        "index": 1,
+        "title": "How Habits Shape Your Identity",
+        "contentMarkdown": "## Three Layers of Behavior Change\n\nChanging habits is challenging because we often try to change the wrong thing. There are three layers at which change can occur:\n\n1. **Outcomes:** Changing your results (losing weight, publishing a book, winning a championship).\n2. **Processes:** Changing your habits and systems (a new gym routine, decluttering your desk).\n3. **Identity:** Changing your beliefs, worldview, and self-image.\n\nMost people begin by focusing on *what* they want to achieve (outcome-based habits). The more durable alternative is building **identity-based habits**, where you start by focusing on *who* you wish to become.\n\n> Every action you take is a vote for the type of person you wish to become. No single instance will transform your beliefs, but as the votes build up, so does the evidence of your new identity.\n\n### Becoming the Person\n\nThe goal is not to read a book; the goal is to *become a reader*. The goal is not to run a marathon; the goal is to *become a runner*. The goal is not to write a line of code; the goal is to *become a builder*.\n\nWhen your behavior and your identity are fully aligned, you are no longer pursuing behavior change—you are simply acting like the type of person you already believe yourself to be."
+      },
+      {
+        "index": 2,
+        "title": "Make It Obvious & Attractive",
+        "contentMarkdown": "## The Four Laws of Behavior Change\n\nEvery habit proceeds through four stages in the same order: **Cue, Craving, Response, and Reward**. To build a good habit, you align with four simple laws:\n\n- **1st Law (Cue):** Make it obvious.\n- **2nd Law (Craving):** Make it attractive.\n- **3rd Law (Response):** Make it easy.\n- **4th Law (Reward):** Make it satisfying.\n\n### Designing Your Environment\n\nEnvironment is the invisible hand that shapes human behavior. People who appear to have tremendous self-control often simply structure their lives so they rarely need to use it.\n\nWant to drink more water? Fill a carafe and place it on your desk each morning. Want to practice guitar? Put the guitar stand in the middle of the living room instead of the closet.\n\n### Implementation Intentions & Habit Stacking\n\nTwo proven formulas turn vague intentions into concrete cues:\n\n> **Implementation Intention:** I will `[BEHAVIOR]` at `[TIME]` in `[LOCATION]`.\n\n> **Habit Stacking:** After `[CURRENT HABIT]`, I will `[NEW HABIT]`.\n\nTo make a habit **attractive**, pair an action you *want* to do with an action you *need* to do—a technique called **temptation bundling**. And surround yourself with a culture where your desired behavior is the normal behavior."
+      },
+      {
+        "index": 3,
+        "title": "Make It Easy & Satisfying",
+        "contentMarkdown": "## Friction and the Two-Minute Rule\n\nHuman behavior follows the **Law of Least Effort**: we naturally gravitate toward the option that requires the least amount of work. Reduce friction for good habits (lay out workout clothes the night before) and increase friction for bad ones (leave your phone in another room).\n\nWhen starting a new habit, it should take **less than two minutes** to do:\n\n- *Read before bed each night* becomes *Read one page*.\n- *Run three miles* becomes *Tie my running shoes*.\n- *Study for class* becomes *Open my notes*.\n\nA habit must be established before it can be improved. Master the art of showing up.\n\n### What Is Immediately Rewarded Is Repeated\n\nOur brains evolved to prioritize immediate rewards over delayed ones. Good habits often have immediate costs and delayed payoffs, while bad habits have immediate payoffs and delayed costs.\n\nTo bridge this gap, attach a small **immediate reward** to good habits—such as visual habit tracking (never breaking the chain). Seeing your streak grow provides instant proof that you are moving forward.\n\n> Missing once is an accident. Missing twice is the start of a new habit."
+      }
+    ]
+  },
+  {
+    "id": "thinking-fast-and-slow",
+    "title": "Thinking, Fast and Slow",
+    "author": "Daniel Kahneman",
+    "coverUrl": "/covers/thinking-fast-and-slow.svg",
+    "categories": ["Psychology", "Science"],
+    "readTimeMinutes": 16,
+    "tagline": "Two systems that drive the way we think.",
+    "overview": "Nobel laureate Daniel Kahneman maps the architecture of human judgment through two distinct modes of thought: fast, intuitive System 1 and slow, deliberate System 2. Through classic experiments, he reveals the cognitive biases, heuristics, and framing effects that quietly govern our everyday decisions.",
+    "keyTakeaways": [
+      "System 1 operates automatically and quickly with little effort; System 2 allocates attention to effortful mental activities.",
+      "System 2 is naturally lazy and frequently endorses the intuitive stories invented by System 1.",
+      "We suffer from WYSIATI ('What You See Is All There Is'), jumping to conclusions from incomplete evidence.",
+      "Losses loom roughly twice as large as equivalent gains—a cornerstone of Prospect Theory."
+    ],
+    "chapters": [
+      {
+        "index": 0,
+        "title": "The Characters of the Story: System 1 & System 2",
+        "contentMarkdown": "## Two Modes of Thought\n\nTo understand how the mind makes decisions, Kahneman introduces two fictional characters that live inside our heads:\n\n- **System 1** operates automatically and quickly, with little or no effort and no sense of voluntary control. It detects hostility in a voice, completes the phrase *bread and...*, and solves `2 + 2`.\n- **System 2** allocates attention to effortful mental activities that demand it, including complex computations like `17 × 24`, parking in a narrow space, or checking the validity of a logical argument.\n\n### The Lazy Controller\n\nThe division of labor between System 1 and System 2 is highly efficient: it minimizes effort and optimizes performance. Most of the time, System 1 runs the show effortlessly and sends impressions and intuitions to System 2.\n\n> Because System 2 is naturally lazy, it often endorses System 1's snap judgments without checking the math.\n\nConsider the famous **bat-and-ball problem**: a bat and ball cost $1.10 in total. The bat costs $1.00 more than the ball. How much does the ball cost? System 1 immediately shouts *10 cents*—which is wrong (the answer is 5 cents). Even highly educated people accept the intuitive answer unless System 2 steps in to verify."
+      },
+      {
+        "index": 1,
+        "title": "Heuristics, Anchoring, and Substitution",
+        "contentMarkdown": "## Answering an Easier Question\n\nWhen faced with a difficult question, System 1 quietly substitutes an easier one without alerting you. Instead of answering *\"How much should I contribute to save an endangered species?\"*, your mind answers *\"How much emotion do I feel when I think of dying dolphins?\"*\n\n### The Anchoring Effect\n\nAnchoring occurs when people consider a particular value for an unknown quantity before estimating that quantity. Even a completely random number—like the spin of a rigged wheel of fortune—drastically pulls estimates up or down.\n\n- In real estate, an artificially high listing price anchors buyers' perception of a home's value.\n- In negotiations, the first offer often sets the gravity well around which all subsequent counters orbit.\n\n### The Availability Heuristic\n\nWe judge the probability of an event by how easily examples come to mind. Vivid, dramatic, or recent events—such as plane crashes or shark attacks—are disproportionately available in memory, causing us to overestimate their likelihood while underestimating mundane risks."
+      },
+      {
+        "index": 2,
+        "title": "Overconfidence and the Illusion of Validity",
+        "contentMarkdown": "## What You See Is All There Is (WYSIATI)\n\nSystem 1 is radically insensitive to both the quality and the quantity of information that gives rise to its impressions. It takes whatever fragmented clues are available and weaves them into the best possible coherent story.\n\n> Confidence is not a reliable indicator of accuracy. It is merely a measure of how smoothly your mind constructed a story from the evidence at hand.\n\n### The Planning Fallacy\n\nBecause we rely on the **inside view**—focusing on our specific plans and best-case scenarios—we routinely underestimate how long projects will take and how much they will cost.\n\nTo counteract this, adopt the **outside view** (reference class forecasting): ask how long *similar* projects actually took in the past, and anchor your estimate to that base rate before adjusting for your specific circumstances."
+      },
+      {
+        "index": 3,
+        "title": "Prospect Theory & Two Selves",
+        "contentMarkdown": "## Why Losses Hurt More Than Gains Feel Good\n\nClassical economics assumed humans evaluate wealth in absolute terms. Kahneman and Amos Tversky's **Prospect Theory** proved that we actually evaluate outcomes relative to a *reference point*—and that **losses loom larger than gains**.\n\nMost people refuse a 50/50 coin flip where they could win $150 or lose $100, even though the expected value is positive. Psychologically, the pain of losing $100 requires roughly $200 of gain to offset.\n\n### Experiencing Self vs. Remembering Self\n\nWe don't choose between experiences; we choose between *memories* of experiences. The **remembering self** evaluates an episode almost entirely by two moments:\n\n1. The **Peak** (the most intense point of pleasure or pain).\n2. The **End** (how the experience finished).\n\nDuration is largely neglected. Understanding this peak-end rule helps explain why we sometimes make choices that optimize for a good story rather than day-to-day well-being."
+      }
+    ]
+  },
+  {
+    "id": "deep-work",
+    "title": "Deep Work",
+    "author": "Cal Newport",
+    "coverUrl": "/covers/deep-work.svg",
+    "categories": ["Productivity", "Business"],
+    "readTimeMinutes": 12,
+    "tagline": "Rules for focused success in a distracted world.",
+    "overview": "Computer science professor Cal Newport argues that the ability to perform distraction-free, cognitively demanding work is becoming simultaneously rarer and more valuable in our economy. Deep Work lays out concrete philosophies and rituals to reclaim unbroken attention.",
+    "keyTakeaways": [
+      "High-Quality Work Produced = (Time Spent) × (Intensity of Focus).",
+      "Switching tasks leaves 'attention residue' that degrades cognitive performance for minutes afterward.",
+      "Schedule every minute of your workday and embrace boredom to retrain your focus muscle.",
+      "Treat shallow work (email, meetings, status pings) as a strictly budgeted resource."
+    ],
+    "chapters": [
+      {
+        "index": 0,
+        "title": "Deep Work Is Valuable, Rare, and Meaningful",
+        "contentMarkdown": "## Defining Deep vs. Shallow Work\n\n**Deep Work** consists of professional activities performed in a state of distraction-free concentration that push your cognitive capabilities to their limit. These efforts create new value, improve your skill, and are hard to replicate.\n\n**Shallow Work** consists of non-cognitively demanding, logistical-style tasks, often performed while distracted—answering routine emails, formatting spreadsheets, or attending status meetings.\n\n### The Law of Productivity\n\n> High-Quality Work Produced = (Time Spent) × (Intensity of Focus)\n\nWhen you switch from a complex task to briefly check Slack or email, your attention doesn't instantly follow you back. Research by Sophie Leroy shows that **attention residue** remains stuck on the previous task, leaving you operating at a fraction of your cognitive capacity.\n\n### Why Focus Creates Meaning\n\nNeuroscience and psychology agree: a deep life is a good life. When you spend hours immersed in craft, your brain enters **flow**, filtering out background anxieties and leaving you with a deep sense of satisfaction at the end of the day."
+      },
+      {
+        "index": 1,
+        "title": "Work Deeply: Four Scheduling Philosophies",
+        "contentMarkdown": "## Building Rituals Instead of Relying on Willpower\n\nWillpower is a finite daily resource. Rather than deciding each morning whether to focus, build a repeatable rhythm using one of four philosophies:\n\n1. **Monastic:** Eliminate shallow obligations almost entirely (best for people with one clear, singular mission).\n2. **Bimodal:** Dedicate multi-day stretches to complete solitude, while leaving the rest of the time open for collaboration.\n3. **Rhythmic:** Create a daily chain—such as writing from 6:00 AM to 9:00 AM every weekday—so deep work becomes automatic.\n4. **Journalistic:** Fit deep work wherever you can into a shifting schedule (requires practiced discipline to switch modes rapidly).\n\n### The Grand Gesture & Shutdown Ritual\n\nSometimes changing your physical environment—booking a quiet library table or a hotel room to finish a pivotal chapter—raises the psychological stakes and unlocks intensity.\n\nEqually vital is a **strict shutdown ritual** at the end of the workday: review tomorrow's plan, close your inbox, and say a closing phrase (e.g., *\"Shutdown complete\"*). True rest restores the directed attention needed for tomorrow's deep sessions."
+      },
+      {
+        "index": 2,
+        "title": "Embrace Boredom & Quit Social Media",
+        "contentMarkdown": "## Don't Take Breaks From Distraction—Take Breaks From Focus\n\nIf you reach for your phone every time you wait in line for coffee or sit at a red light, you train your brain to panic at the slightest hint of boredom. When you later sit down to solve a hard problem, your mind reflexively craves a dopamine hit.\n\nInstead of scheduling occasional blocks of focus, **schedule blocks of internet access**. Outside those blocks, stay offline—even if you get stuck. Let your mind sit with boredom.\n\n### The Craftsman Approach to Tool Selection\n\nMost people adopt digital tools using the *Any-Benefit Approach*: if a network offers even a tiny upside, they keep it. Instead, use the **Craftsman Approach**:\n\n> Identify the core factors that determine success and happiness in your professional and personal life. Adopt a tool only if its positive impacts on these factors substantially outweigh its negative impacts."
+      },
+      {
+        "index": 3,
+        "title": "Drain the Shallows",
+        "contentMarkdown": "## Budget Your Shallow Work\n\nMost knowledge workers can sustain only about **four hours** of true deep work per day. Yet without guardrails, shallow tasks expand to fill every available hour.\n\n- **Time-Block Your Day:** Divide your day into blocks and assign specific tasks to each. If the schedule slips, simply redraw the remaining blocks.\n- **Cap Shallow Work:** Aim to keep shallow obligations under 30–50% of your workweek.\n- **Become Hard to Reach:** Write clearer, process-centric emails that anticipate follow-up questions and close loops in one message instead of six.\n\nClarity about what matters provides clarity about what does not."
+      }
+    ]
+  },
+  {
+    "id": "psychology-of-money",
+    "title": "The Psychology of Money",
+    "author": "Morgan Housel",
+    "coverUrl": "/covers/psychology-of-money.svg",
+    "categories": ["Business", "Psychology"],
+    "readTimeMinutes": 13,
+    "tagline": "Timeless lessons on wealth, greed, and happiness.",
+    "overview": "Doing well with money has little to do with how smart you are and a lot to do with how you behave. Through 19 crisp stories, Morgan Housel illustrates how ego, compounding, luck, and margin of safety shape long-term financial freedom.",
+    "keyTakeaways": [
+      "Financial success is a soft skill—how you behave matters far more than what you know.",
+      "Compounding works miracles, but only if you give it decades without interrupting it.",
+      "Wealth is what you don't see: it is the cars not purchased and the flexibility preserved.",
+      "The highest dividend money pays is control over your own time."
+    ],
+    "chapters": [
+      {
+        "index": 0,
+        "title": "No One's Crazy & Luck vs. Risk",
+        "contentMarkdown": "## Your Personal Financial History\n\nPeople from different generations and backgrounds make wildly different financial decisions—not because they are irrational, but because their personal experiences represent maybe 0.00000001% of what's happened in the world, yet **80% of how they think the world works**.\n\nSomeone who came of age during runaway inflation views bonds differently than someone who came of age during a roaring bull market.\n\n### Luck and Risk Are Siblings\n\nNothing is as good or as bad as it seems. Both luck and risk are the reality that every outcome in life is guided by forces other than individual effort.\n\n> Be careful who you praise and admire. Be careful who you look down upon and wish to avoid becoming.\n\nWhen studying success, avoid focusing on extreme outliers—they are often heavily influenced by luck. Instead, look for broad patterns that repeat across many people."
+      },
+      {
+        "index": 1,
+        "title": "Never Enough & Confounding Compounding",
+        "contentMarkdown": "## Moving the Goalposts\n\nThe hardest financial skill is getting the goalpost to stop moving. Social comparison is a ceilingless battle that no one can ever win. There is no reason to risk what you have and need for what you don't have and don't need.\n\n### The Secret of Warren Buffett\n\nMore than 95% of Warren Buffett's net worth was accumulated **after his 65th birthday**. His skill is investing, but his *secret* is **time**.\n\nGood investing isn't necessarily about earning the highest returns—because the highest returns tend to be one-off hits that can't be repeated. It's about earning pretty good returns that you can stick with for the longest period of time. That's when compounding runs wild."
+      },
+      {
+        "index": 2,
+        "title": "Getting Wealthy vs. Staying Wealthy",
+        "contentMarkdown": "## Survival Is the Cornerstone\n\nGetting money requires taking risks, being optimistic, and putting yourself out there. **Keeping money** requires the opposite: humility, fear that what you've made can be taken away just as fast, and frugality.\n\nA mindset that can be paranoid and optimistic at the same time is hard to maintain, yet it is essential. Plan on your plan not going according to plan.\n\n### Room for Error\n\n- **Margin of Safety:** Never rely on a single point of failure.\n- **Barbell Personality:** Be optimistic about the long-term future, but cautious about what could wipe you out in the short term.\n- **Reasonable > Rational:** Aiming to be mostly *reasonable* works better than trying to be coldly *rational*, because you can actually sleep at night and stay invested during downturns."
+      },
+      {
+        "index": 3,
+        "title": "Freedom, Wealth, and Saving",
+        "contentMarkdown": "## Wealth Is What You Don't See\n\nSpending money to show people how much money you have is the fastest way to have less money. **Rich** is a current income; **wealth** is hidden—it's income not spent, converted into optionality and future freedom.\n\n> Controlling your time is the highest dividend money pays.\n\nThe ability to do what you want, when you want, with who you want, for as long as you want, is priceless. And you don't need a specific reason to save—saving simply hedges against life's inevitable ability to surprise the hell out of you at the worst possible moment."
+      }
+    ]
+  },
+  {
+    "id": "sapiens",
+    "title": "Sapiens",
+    "author": "Yuval Noah Harari",
+    "coverUrl": "/covers/sapiens.svg",
+    "categories": ["Science", "History"],
+    "readTimeMinutes": 15,
+    "tagline": "A brief history of humankind.",
+    "overview": "Yuval Noah Harari traces the 70,000-year arc of Homo sapiens from an insignificant African ape to the planet's dominant force, organized around three great revolutions: the Cognitive, Agricultural, and Scientific Revolutions.",
+    "keyTakeaways": [
+      "Homo sapiens conquered the world because of its unique ability to cooperate flexibly in massive numbers through shared fictions.",
+      "The Agricultural Revolution expanded the human population, yet often left individual farmers working harder on narrower diets.",
+      "Money, empires, and universal religions gradually unified fragmented tribes into a single global network.",
+      "The Scientific Revolution began not with certainty, but with the radical admission of ignorance: 'We don't know.'"
+    ],
+    "chapters": [
+      {
+        "index": 0,
+        "title": "The Cognitive Revolution",
+        "contentMarkdown": "## The Secret of Flexible Mass Cooperation\n\nAbout 70,000 years ago, *Homo sapiens* was just one of at least six human species walking the Earth—alongside Neanderthals, *Homo erectus*, and Denisovans. Then something remarkable happened: our language evolved the capacity to describe not just lions by the river, but **things that do not exist at all**.\n\nChimpanzees can cooperate in bands of up to 50 individuals who know each other intimately. Beyond that threshold, social order breaks down. Humans broke past this barrier by inventing **shared myths**: nations, laws, gods, corporations, and human rights.\n\n> Two strangers who have never met can nevertheless cooperate effectively if they both believe in the same common myths.\n\nBecause these imagined realities exist in our collective imagination rather than our DNA, humans can rapidly rewrite their social behavior—adapting in decades rather than waiting millions of years for genetic evolution."
+      },
+      {
+        "index": 1,
+        "title": "The Agricultural Revolution",
+        "contentMarkdown": "## History's Biggest Trap?\n\nAround 10,000 BCE, humans began domesticating wheat, rice, and livestock. We like to think we domesticated wheat, yet Harari flips the perspective: **wheat domesticated us**.\n\n- Foragers enjoyed varied diets, worked fewer hours, and faced fewer contagious diseases.\n- Early farmers endured backbreaking labor, fragile monoculture harvests, and crowded settlements.\n\nWhy didn't humans turn back? Because the transition happened gradually over generations. Extra calories fueled population booms; once a village grew too large to return to foraging, the **luxury trap** snapped shut.\n\nSurplus grain, however, enabled cities, specialists, taxes, and eventually **writing**—invented first not for poetry, but for accounting."
+      },
+      {
+        "index": 2,
+        "title": "The Unification of Humankind",
+        "contentMarkdown": "## Three Global Unifiers\n\nOver millennia, thousands of independent human worlds merged into one global village through three universal orders:\n\n1. **Money:** The most universal and efficient system of mutual trust ever devised. Even people who disagree on politics or religion agree on the value of a coin.\n2. **Empires:** Despite their brutality, empires standardized laws, languages, and infrastructure across vast regions, blending local cultures into broader civilizations.\n3. **Universal Religions:** Gave superhuman legitimacy to fragile human social orders, uniting distant peoples under shared moral codes."
+      },
+      {
+        "index": 3,
+        "title": "The Scientific Revolution",
+        "contentMarkdown": "## The Discovery of Ignorance\n\nModern science differs from all previous traditions of knowledge in one astonishing way: **its willingness to admit ignorance**. Premodern traditions assumed everything important was already known in ancient texts. Science starts from *ignoramus*—\"we do not know\"—and pairs observation with mathematics to discover new powers.\n\n### The Feedback Loop of Science, Empire, and Capital\n\nScience alone is expensive. What supercharged the last 500 years was a feedback loop between **scientific research**, **imperial ambition**, and **credit-fueled capitalism**—all built on a shared belief that tomorrow's pie will be larger than today's.\n\n> We have become more powerful than ever before, yet we have very little idea what to do with all that power—or whether it has made us any happier."
+      }
+    ]
+  }
+]

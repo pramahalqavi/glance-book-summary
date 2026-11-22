@@ -1,0 +1,139 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model (Glance — Book Summary PWA)
+// ===============================================================
+//
+// Collection: catalog
+// Document ID: docId (e.g., "books")
+// Access: Public read-only (explicitly requested in PRD §5.2; contains no PII).
+//         Writes are performed exclusively via Firebase Admin SDK seed script.
+// Fields (managed by Admin SDK):
+//   - updatedAt: string (ISO 8601) or timestamp - last catalog update time
+//   - books: list<map> - array of book metadata objects
+//       (id, title, author, coverUrl, categories, readTimeMinutes, chapterCount, tagline)
+//
+// Collection: summaries
+// Document ID: bookId (e.g., "atomic-habits")
+// Access: Public read-only (explicitly requested in PRD §5.2; contains no PII).
+//         Writes are performed exclusively via Firebase Admin SDK seed script.
+// Fields (managed by Admin SDK):
+//   - id: string - book identifier matching document ID
+//   - title: string - book title
+//   - author: string - book author
+//   - overview: string - brief synopsis
+//   - keyTakeaways: list<string> - key summary takeaways
+//   - chapters: list<map> - ordered chapters ({ index, title, contentMarkdown })
+//
+// Collection: users (Phase 2 — Optional Cloud Sync)
+// Document ID: uid (must match Firebase Auth request.auth.uid)
+// Access: Authenticated owner-only read, create, update, and delete.
+// Fields (all optional individually to support merge writes, strictly schema-bound):
+//   - preferences: map (optional) - allowed keys only:
+//       - readingMode: string (optional, enum: 'scroll' | 'swipe')
+//       - theme: string (optional, enum: 'light' | 'sepia' | 'dark')
+//       - fontSize: string (optional, enum: 'sm' | 'md' | 'lg' | 'xl')
+//   - bookmarks: list<string> (optional, max 500 entries, bookId strings 1..128 chars)
+//   - progress: map (optional, max 500 entries, keyed by bookId)
+//   - updatedAt: timestamp (optional, server/client sync timestamp)
+//
+// All other collections and subcollections are denied by default.
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    // Check if the request is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Check if the authenticated user owns the document at {userId}
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Validate that a map contains only the allowed keys
+    function hasOnlyAllowedFields(data, fields) {
+      return data.keys().hasOnly(fields);
+    }
+
+    // Validate a string's type and length bounds
+    function isValidString(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    // ===============================================================
+    // Domain Validators (Used in BOTH create and update)
+    // ===============================================================
+
+    function isValidPreferences(prefs) {
+      return prefs is map &&
+        prefs.keys().hasOnly(['readingMode', 'theme', 'fontSize']) &&
+        (!('readingMode' in prefs) || (prefs.readingMode is string && prefs.readingMode in ['scroll', 'swipe'])) &&
+        (!('theme' in prefs) || (prefs.theme is string && prefs.theme in ['light', 'sepia', 'dark'])) &&
+        (!('fontSize' in prefs) || (prefs.fontSize is string && prefs.fontSize in ['sm', 'md', 'lg', 'xl']));
+    }
+
+    function isValidBookmarks(bookmarks) {
+      return bookmarks is list &&
+        bookmarks.size() <= 500 &&
+        (
+          bookmarks.size() == 0 ||
+          (
+            isValidString(bookmarks[0], 1, 128) &&
+            isValidString(bookmarks[bookmarks.size() - 1], 1, 128)
+          )
+        );
+    }
+
+    function isValidProgress(progress) {
+      return progress is map &&
+        progress.keys().size() <= 500;
+    }
+
+    function isValidUserDoc(data) {
+      return data.keys().size() > 0 &&
+        hasOnlyAllowedFields(data, ['preferences', 'bookmarks', 'progress', 'updatedAt']) &&
+        (!('preferences' in data) || isValidPreferences(data.preferences)) &&
+        (!('bookmarks' in data) || isValidBookmarks(data.bookmarks)) &&
+        (!('progress' in data) || isValidProgress(data.progress)) &&
+        (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    // Public read-only catalog index (e.g., catalog/books).
+    // Writes are performed exclusively via Firebase Admin SDK.
+    match /catalog/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Public read-only book summaries (summaries/{bookId}).
+    // Writes are performed exclusively via Firebase Admin SDK.
+    match /summaries/{bookId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Phase 2: Authenticated owner-only user sync data.
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid) && isValidUserDoc(request.resource.data);
+      allow update: if isOwner(uid) && isValidUserDoc(request.resource.data);
+      allow delete: if isOwner(uid);
+    }
+
+    // Default deny for all other collections and subcollections.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

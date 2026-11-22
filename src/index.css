@@ -1,0 +1,187 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@layer base {
+  :root {
+    --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-serif: "Newsreader", Georgia, Cambria, "Times New Roman", Times, serif;
+  }
+
+  html,
+  body {
+    font-family: var(--font-sans);
+    background-color: #fafaf9;
+    color: #0f172a;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+  }
+}
+
+.font-serif-editorial {
+  font-family: var(--font-serif);
+}
+
+/* Safe-area inset helpers for iOS / Android PWA */
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.pl-safe {
+  padding-left: env(safe-area-inset-left, 0px);
+}
+.pr-safe {
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* Hide scrollbars cleanly for horizontal pill carousels */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Reader Markdown Typography & Theme Tokens */
+.reader-prose {
+  font-family: var(--font-serif);
+  line-height: 1.75;
+}
+
+.reader-prose h2 {
+  font-family: var(--font-serif);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  margin-top: 1.25em;
+  margin-bottom: 0.6em;
+  line-height: 1.25;
+  break-after: avoid;
+}
+
+.reader-prose h2:first-child {
+  margin-top: 0;
+}
+
+.reader-prose h3 {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-top: 1.35em;
+  margin-bottom: 0.5em;
+  line-height: 1.35;
+  break-after: avoid;
+}
+
+.reader-prose p {
+  margin-top: 0;
+  margin-bottom: 1em;
+}
+
+.reader-prose ul,
+.reader-prose ol {
+  margin-top: 0.25em;
+  margin-bottom: 1.1em;
+  padding-left: 1.35em;
+}
+
+.reader-prose li {
+  margin-bottom: 0.45em;
+}
+
+.reader-prose blockquote {
+  margin: 1.25em 0;
+  padding: 0.85em 1.15em;
+  border-left-width: 3px;
+  border-radius: 0 0.75rem 0.75rem 0;
+  font-style: italic;
+  break-inside: avoid;
+}
+
+.reader-prose blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+.reader-prose code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.88em;
+  padding: 0.12em 0.36em;
+  border-radius: 0.35rem;
+}
+
+/* Theme-specific prose styling */
+.reader-theme-light {
+  --reader-bg: #fafaf9;
+  --reader-surface: #ffffff;
+  --reader-text: #1c1917;
+  --reader-muted: #57534e;
+  --reader-border: #e7e5e4;
+  --reader-accent: #059669;
+  --reader-quote-bg: #f0fdf4;
+  --reader-quote-border: #10b981;
+  --reader-code-bg: #f5f5f4;
+}
+
+.reader-theme-sepia {
+  --reader-bg: #f4ecd8;
+  --reader-surface: #fbf6e9;
+  --reader-text: #3d2e1e;
+  --reader-muted: #78634a;
+  --reader-border: #e2d5b7;
+  --reader-accent: #b45309;
+  --reader-quote-bg: #ebe0c5;
+  --reader-quote-border: #d97706;
+  --reader-code-bg: #e9ddc2;
+}
+
+.reader-theme-dark {
+  --reader-bg: #000000;
+  --reader-surface: #0f1115;
+  --reader-text: #e5e7eb;
+  --reader-muted: #9ca3af;
+  --reader-border: #1f2937;
+  --reader-accent: #34d399;
+  --reader-quote-bg: #0b1f1a;
+  --reader-quote-border: #10b981;
+  --reader-code-bg: #181c23;
+}
+
+.reader-prose blockquote {
+  background-color: var(--reader-quote-bg);
+  border-left-color: var(--reader-quote-border);
+}
+
+.reader-prose code {
+  background-color: var(--reader-code-bg);
+}
+
+@keyframes chapterSlideFromRight {
+  from {
+    opacity: 0.35;
+    transform: translate3d(36px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes chapterSlideFromLeft {
+  from {
+    opacity: 0.35;
+    transform: translate3d(-36px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.animate-chapter-next {
+  animation: chapterSlideFromRight 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.animate-chapter-prev {
+  animation: chapterSlideFromLeft 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}

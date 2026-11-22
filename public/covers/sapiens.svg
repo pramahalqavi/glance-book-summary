@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 560">
+  <defs>
+    <linearGradient id="g5" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3b0764"/>
+      <stop offset="100%" stop-color="#7e22ce"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="560" fill="url(#g5)"/>
+  <circle cx="200" cy="210" r="92" fill="#f472b6" opacity="0.22"/>
+  <path d="M120 270 C150 150, 250 150, 280 270" fill="none" stroke="#f0abfc" stroke-width="5"/>
+  <circle cx="200" cy="180" r="18" fill="#fae8ff"/>
+  <text x="36" y="425" fill="#faf5ff" font-family="Georgia, serif" font-size="38" font-weight="700">Sapiens</text>
+  <text x="36" y="463" fill="#e9d5ff" font-family="Georgia, serif" font-size="18" font-style="italic">A Brief History of Humankind</text>
+  <text x="36" y="512" fill="#d8b4fe" font-family="system-ui, sans-serif" font-size="15" font-weight="600" letter-spacing="2">YUVAL NOAH HARARI</text>
+</svg>
