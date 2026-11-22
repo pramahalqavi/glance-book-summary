@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type { FontSize } from '../../types/book';
+import type { FontSize, ReaderFont } from '../../types/book';
 
 const FONT_SIZE_CLASSES: Record<FontSize, string> = {
   sm: 'text-[16px] sm:text-[17px]',
@@ -13,16 +13,20 @@ const FONT_SIZE_CLASSES: Record<FontSize, string> = {
 interface MarkdownContentProps {
   markdown: string;
   fontSize: FontSize;
+  fontFamily?: ReaderFont;
   className?: string;
 }
 
 export const MarkdownContent = memo(function MarkdownContent({
   markdown,
   fontSize,
+  fontFamily = 'newsreader',
   className = '',
 }: MarkdownContentProps) {
   return (
-    <div className={`reader-prose ${FONT_SIZE_CLASSES[fontSize]} ${className}`}>
+    <div
+      className={`reader-prose reader-font-${fontFamily} ${FONT_SIZE_CLASSES[fontSize]} ${className}`}
+    >
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown>
     </div>
   );

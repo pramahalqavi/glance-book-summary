@@ -3,12 +3,10 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft,
   Bookmark,
-  BookOpenCheck,
   ChevronLeft,
   ChevronRight,
   List,
   PanelLeft,
-  ScrollText,
   Settings2,
 } from 'lucide-react';
 import { fetchBookSummary } from '../lib/repository';
@@ -294,31 +292,6 @@ export function ReaderPage() {
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            {/* Quick Mode Pill */}
-            <button
-              type="button"
-              onClick={() =>
-                updatePreferences({
-                  readingMode: preferences.readingMode === 'scroll' ? 'swipe' : 'scroll',
-                })
-              }
-              title="Switch reading mode (Scroll / Swipe)"
-              style={{ borderColor: 'var(--reader-border)' }}
-              className="hidden sm:inline-flex items-center gap-1.5 h-9 px-3 rounded-full border text-xs font-medium hover:bg-black/5 cursor-pointer"
-            >
-              {preferences.readingMode === 'scroll' ? (
-                <>
-                  <ScrollText className="w-3.5 h-3.5" />
-                  Scroll
-                </>
-              ) : (
-                <>
-                  <BookOpenCheck className="w-3.5 h-3.5" />
-                  Swipe
-                </>
-              )}
-            </button>
-
             {/* Desktop Pinned TOC Sidebar Toggle */}
             <button
               type="button"
@@ -370,7 +343,7 @@ export function ReaderPage() {
       </header>
 
       {/* Main Reader Area (+ Optional Collapsible Desktop Sidebar) */}
-      <div className="flex-1 h-full flex overflow-hidden relative">
+      <div className="flex-1 min-h-0 h-full flex overflow-hidden relative">
         {desktopTocPinned && (
           <aside
             style={{
@@ -417,7 +390,7 @@ export function ReaderPage() {
         )}
 
         {/* Active Chapter Surface */}
-        <div className="flex-1 h-full relative overflow-hidden">
+        <div className="flex-1 min-h-0 h-full relative overflow-hidden">
           {/* Desktop Subtle Hoverable Side Margin Arrows */}
           <button
             type="button"
@@ -453,6 +426,7 @@ export function ReaderPage() {
                 chapter={currentChapter}
                 chapterCount={chapterCount}
                 fontSize={preferences.fontSize}
+                fontFamily={preferences.fontFamily}
                 initialScrollRatio={
                   savedProgress?.chapterIndex === chapterIndex ? savedProgress.scrollRatio : 0
                 }
@@ -469,6 +443,7 @@ export function ReaderPage() {
                 chapter={currentChapter}
                 chapterCount={chapterCount}
                 fontSize={preferences.fontSize}
+                fontFamily={preferences.fontFamily}
                 pageIndex={pageIndex}
                 isCompleted={isCompleted}
                 onPageCountChange={handlePageCountChange}

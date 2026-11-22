@@ -32,7 +32,8 @@ if (!fs.existsSync(inputPath)) {
   process.exit(1);
 }
 
-const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+const defaultCredPath = path.resolve(__dirname, '../service-account.json');
+const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS || (fs.existsSync(defaultCredPath) ? defaultCredPath : '');
 if (credPath && fs.existsSync(credPath)) {
   const serviceAccount = JSON.parse(fs.readFileSync(credPath, 'utf-8'));
   initializeApp({ credential: cert(serviceAccount) });

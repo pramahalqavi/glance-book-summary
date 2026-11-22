@@ -57,6 +57,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.remove('reader-theme-light', 'reader-theme-sepia', 'reader-theme-dark');
+    root.classList.add(`reader-theme-${preferences.theme}`);
+
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) {
+      const color =
+        preferences.theme === 'dark'
+          ? '#0a0c10'
+          : preferences.theme === 'sepia'
+          ? '#f4ecd8'
+          : '#fafaf9';
+      metaTheme.setAttribute('content', color);
+    }
+  }, [preferences.theme]);
+
   const updatePreferences = useCallback((patch: Partial<ReaderPreferences>) => {
     setPreferences((prev) => {
       const next = { ...prev, ...patch };

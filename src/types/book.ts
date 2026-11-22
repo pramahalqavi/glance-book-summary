@@ -35,11 +35,19 @@ export interface BookSummary {
 export type ReadingMode = 'scroll' | 'swipe';
 export type ReaderTheme = 'light' | 'sepia' | 'dark';
 export type FontSize = 'sm' | 'md' | 'lg' | 'xl';
+export type ReaderFont =
+  | 'newsreader'
+  | 'literata'
+  | 'lora'
+  | 'merriweather'
+  | 'inter'
+  | 'jakarta';
 
 export interface ReaderPreferences {
   readingMode: ReadingMode;
   theme: ReaderTheme;
   fontSize: FontSize;
+  fontFamily: ReaderFont;
 }
 
 export interface BookProgress {

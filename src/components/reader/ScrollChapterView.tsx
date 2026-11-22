@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { MarkdownContent } from './MarkdownContent';
-import type { Chapter, FontSize } from '../../types/book';
+import type { Chapter, FontSize, ReaderFont } from '../../types/book';
 
 interface ScrollChapterViewProps {
   chapter: Chapter;
   chapterCount: number;
   fontSize: FontSize;
+  fontFamily: ReaderFont;
   initialScrollRatio?: number;
   isCompleted: boolean;
   onScrollRatioChange: (ratio: number) => void;
@@ -26,6 +27,7 @@ export function ScrollChapterView({
   chapter,
   chapterCount,
   fontSize,
+  fontFamily,
   initialScrollRatio = 0,
   isCompleted,
   onScrollRatioChange,
@@ -275,14 +277,14 @@ export function ScrollChapterView({
       }}
       onWheel={onWheel}
       onClick={handleContainerClick}
-      className="h-full w-full overflow-y-auto overscroll-x-none"
+      className="h-full w-full overflow-y-auto overscroll-x-none touch-pan-y"
     >
       <article
         style={{
           transform: dragX !== 0 ? `translate3d(${dragX}px, 0, 0)` : undefined,
           transition: isDragging ? 'none' : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1)',
         }}
-        className="max-w-[680px] mx-auto px-6 sm:px-10 pt-20 pb-28 select-text"
+        className="max-w-[680px] mx-auto px-6 sm:px-10 pt-18 pb-16 select-text"
       >
         <header className="mb-7">
           <p
@@ -291,17 +293,24 @@ export function ScrollChapterView({
           >
             Chapter {chapter.index + 1} of {chapterCount}
           </p>
-          <h1 className="font-serif-editorial text-2xl sm:text-3xl font-bold leading-tight">
+          <h1
+            className={`reader-font-${fontFamily} text-2xl sm:text-3xl font-bold leading-tight`}
+            style={{ fontFamily: 'var(--reader-font-family, var(--font-serif))' }}
+          >
             {chapter.title}
           </h1>
         </header>
 
-        <MarkdownContent markdown={chapter.contentMarkdown} fontSize={fontSize} />
+        <MarkdownContent
+          markdown={chapter.contentMarkdown}
+          fontSize={fontSize}
+          fontFamily={fontFamily}
+        />
 
         {/* End-of-chapter / End-of-book footer */}
         <footer
           style={{ borderColor: 'var(--reader-border)' }}
-          className="mt-12 pt-8 border-t space-y-4"
+          className="mt-8 pt-6 border-t"
         >
           {isLast ? (
             <div
@@ -367,10 +376,6 @@ export function ScrollChapterView({
               </button>
             </div>
           )}
-
-          <p className="text-center text-xs opacity-50 pt-1">
-            Tip: Swipe horizontally or use ← / → keys to switch chapters
-          </p>
         </footer>
       </article>
     </div>

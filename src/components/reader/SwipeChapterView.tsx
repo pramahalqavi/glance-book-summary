@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import { MarkdownContent } from './MarkdownContent';
-import type { Chapter, FontSize } from '../../types/book';
+import type { Chapter, FontSize, ReaderFont } from '../../types/book';
 
 interface SwipeChapterViewProps {
   chapter: Chapter;
   chapterCount: number;
   fontSize: FontSize;
+  fontFamily: ReaderFont;
   pageIndex: number;
   isCompleted: boolean;
   onPageCountChange: (count: number) => void;
@@ -27,6 +28,7 @@ export function SwipeChapterView({
   chapter,
   chapterCount,
   fontSize,
+  fontFamily,
   pageIndex,
   isCompleted,
   onPageCountChange,
@@ -89,7 +91,7 @@ export function SwipeChapterView({
 
   useLayoutEffect(() => {
     measurePages();
-  }, [measurePages, chapter.index, fontSize]);
+  }, [measurePages, chapter.index, fontSize, fontFamily]);
 
   useEffect(() => {
     const vp = viewportRef.current;
@@ -280,12 +282,19 @@ export function SwipeChapterView({
             >
               Chapter {chapter.index + 1} of {chapterCount}
             </p>
-            <h1 className="font-serif-editorial text-2xl sm:text-3xl font-bold leading-tight">
+            <h1
+              className={`reader-font-${fontFamily} text-2xl sm:text-3xl font-bold leading-tight`}
+              style={{ fontFamily: 'var(--reader-font-family, var(--font-serif))' }}
+            >
               {chapter.title}
             </h1>
           </header>
 
-          <MarkdownContent markdown={chapter.contentMarkdown} fontSize={fontSize} />
+          <MarkdownContent
+            markdown={chapter.contentMarkdown}
+            fontSize={fontSize}
+            fontFamily={fontFamily}
+          />
 
           {isLastChapter && (
             <div

@@ -46,12 +46,13 @@ export function HomePage() {
           <div className="flex items-center justify-between mb-3">
             <h2
               id="continue-reading-heading"
-              className="text-sm font-semibold uppercase tracking-wider text-stone-500"
+              style={{ color: 'var(--reader-muted)' }}
+              className="text-sm font-semibold uppercase tracking-wider"
             >
               Continue Reading
             </h2>
           </div>
-          <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
+          <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
             {continueReadingBooks.map(({ book, progress }) => {
               const pct = Math.min(
                 95,
@@ -61,7 +62,11 @@ export function HomePage() {
                 <Link
                   key={book.id}
                   to={`/read/${book.id}?chapter=${progress.chapterIndex}`}
-                  className="shrink-0 w-[290px] sm:w-[340px] bg-white rounded-2xl border border-stone-200/80 p-3.5 flex items-center gap-3.5 shadow-xs hover:shadow-md hover:border-emerald-300 transition-all group"
+                  style={{
+                    backgroundColor: 'var(--reader-surface)',
+                    borderColor: 'var(--reader-border)',
+                  }}
+                  className="shrink-0 w-[280px] sm:w-[340px] rounded-2xl border p-3.5 flex items-center gap-3.5 shadow-xs hover:shadow-md transition-all group"
                 >
                   <img
                     src={book.coverUrl}
@@ -69,21 +74,38 @@ export function HomePage() {
                     className="w-16 h-22 rounded-xl object-cover shrink-0 shadow-xs"
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-semibold text-emerald-700">
+                    <p
+                      style={{ color: 'var(--reader-accent)' }}
+                      className="text-[11px] font-semibold"
+                    >
                       Chapter {progress.chapterIndex + 1} of {book.chapterCount}
                     </p>
-                    <h3 className="font-serif-editorial font-bold text-slate-900 truncate mt-0.5">
+                    <h3 className="font-serif-editorial font-bold truncate mt-0.5">
                       {book.title}
                     </h3>
-                    <p className="text-xs text-stone-500 truncate">{book.author}</p>
-                    <div className="mt-2.5 h-1.5 w-full rounded-full bg-stone-100 overflow-hidden">
+                    <p style={{ color: 'var(--reader-muted)' }} className="text-xs truncate">
+                      {book.author}
+                    </p>
+                    <div
+                      style={{ backgroundColor: 'var(--reader-surface-muted)' }}
+                      className="mt-2.5 h-1.5 w-full rounded-full overflow-hidden"
+                    >
                       <div
-                        className="h-full bg-emerald-600 rounded-full"
-                        style={{ width: `${pct}%` }}
+                        style={{
+                          width: `${pct}%`,
+                          backgroundColor: 'var(--reader-accent)',
+                        }}
+                        className="h-full rounded-full"
                       />
                     </div>
                   </div>
-                  <div className="w-9 h-9 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                  <div
+                    style={{
+                      backgroundColor: 'var(--reader-surface-muted)',
+                      color: 'var(--reader-accent)',
+                    }}
+                    className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-transform group-hover:translate-x-0.5"
+                  >
                     <ArrowRight className="w-4 h-4" />
                   </div>
                 </Link>
@@ -97,31 +119,40 @@ export function HomePage() {
       <section className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
-            <h1 className="font-serif-editorial text-3xl sm:text-4xl font-bold tracking-tight text-slate-900">
+            <h1 className="font-serif-editorial text-3xl sm:text-4xl font-bold tracking-tight">
               Explore Summaries
             </h1>
-            <p className="text-stone-500 text-sm sm:text-base mt-1">
+            <p style={{ color: 'var(--reader-muted)' }} className="text-sm sm:text-base mt-1">
               Key insights from essential books, crafted for Scroll or Swipe reading.
             </p>
           </div>
 
           {/* Search Input */}
           <div className="relative w-full sm:w-80">
-            <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Search
+              style={{ color: 'var(--reader-muted)' }}
+              className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+            />
             <input
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search title, author, or topic..."
               aria-label="Search book summaries"
-              className="w-full h-11 pl-10 pr-10 rounded-full bg-white border border-stone-200 text-sm text-slate-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600 transition-all shadow-2xs"
+              style={{
+                backgroundColor: 'var(--reader-surface)',
+                borderColor: 'var(--reader-border)',
+                color: 'var(--reader-text)',
+              }}
+              className="w-full h-11 pl-10 pr-10 rounded-full border text-sm placeholder:opacity-60 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 transition-all shadow-2xs"
             />
             {query && (
               <button
                 type="button"
                 onClick={() => setQuery('')}
                 aria-label="Clear search"
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center text-stone-400 hover:text-slate-700 hover:bg-stone-100 cursor-pointer"
+                style={{ color: 'var(--reader-muted)' }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center hover:opacity-100 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -133,7 +164,7 @@ export function HomePage() {
         <div
           role="tablist"
           aria-label="Filter by category"
-          className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 -mx-4 px-4 sm:mx-0 sm:px-0"
+          className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1"
         >
           {categories.map((cat) => {
             const active = selectedCategory === cat;
@@ -144,11 +175,12 @@ export function HomePage() {
                 role="tab"
                 aria-selected={active}
                 onClick={() => setSelectedCategory(cat)}
-                className={`shrink-0 min-h-[40px] px-4 rounded-full text-sm font-medium transition-all cursor-pointer ${
-                  active
-                    ? 'bg-slate-900 text-white shadow-xs'
-                    : 'bg-white border border-stone-200 text-stone-600 hover:border-stone-300 hover:text-slate-900'
-                }`}
+                style={{
+                  backgroundColor: active ? 'var(--reader-accent)' : 'var(--reader-surface)',
+                  borderColor: active ? 'var(--reader-accent)' : 'var(--reader-border)',
+                  color: active ? '#ffffff' : 'var(--reader-muted)',
+                }}
+                className="shrink-0 min-h-[40px] px-4 rounded-full border text-sm font-medium transition-all cursor-pointer"
               >
                 {cat}
               </button>
@@ -163,19 +195,30 @@ export function HomePage() {
           {Array.from({ length: 4 }).map((_, i) => (
             <div
               key={i}
-              className="h-96 rounded-2xl bg-stone-200/60 animate-pulse"
+              style={{ backgroundColor: 'var(--reader-surface-muted)' }}
+              className="h-96 rounded-2xl animate-pulse"
             />
           ))}
         </div>
       ) : filteredBooks.length === 0 ? (
-        <div className="py-16 text-center bg-white rounded-3xl border border-stone-200/80 px-6">
-          <div className="w-12 h-12 rounded-2xl bg-stone-100 text-stone-400 flex items-center justify-center mx-auto mb-3">
+        <div
+          style={{
+            backgroundColor: 'var(--reader-surface)',
+            borderColor: 'var(--reader-border)',
+          }}
+          className="py-16 text-center rounded-3xl border px-6"
+        >
+          <div
+            style={{
+              backgroundColor: 'var(--reader-surface-muted)',
+              color: 'var(--reader-muted)',
+            }}
+            className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3"
+          >
             <BookOpen className="w-6 h-6" />
           </div>
-          <h3 className="font-serif-editorial text-xl font-bold text-slate-900">
-            No matching summaries
-          </h3>
-          <p className="text-sm text-stone-500 mt-1 max-w-sm mx-auto">
+          <h3 className="font-serif-editorial text-xl font-bold">No matching summaries</h3>
+          <p style={{ color: 'var(--reader-muted)' }} className="text-sm mt-1 max-w-sm mx-auto">
             Try another keyword or clear your category filter to browse the full catalog.
           </p>
           <button
@@ -184,7 +227,8 @@ export function HomePage() {
               setQuery('');
               setSelectedCategory('All');
             }}
-            className="mt-4 px-5 py-2.5 rounded-full bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 transition-colors cursor-pointer"
+            style={{ backgroundColor: 'var(--reader-accent)' }}
+            className="mt-4 px-5 py-2.5 rounded-full text-white text-sm font-medium transition-opacity hover:opacity-90 cursor-pointer"
           >
             Reset Filters
           </button>

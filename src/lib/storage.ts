@@ -8,6 +8,7 @@ export const DEFAULT_PREFERENCES: ReaderPreferences = {
   readingMode: 'scroll',
   theme: 'light',
   fontSize: 'md',
+  fontFamily: 'newsreader',
 };
 
 function safeRead<T>(key: string, fallback: T): T {
@@ -40,6 +41,14 @@ export function loadPreferences(): ReaderPreferences {
       stored.fontSize === 'xl'
         ? stored.fontSize
         : 'md',
+    fontFamily:
+      stored.fontFamily === 'literata' ||
+      stored.fontFamily === 'lora' ||
+      stored.fontFamily === 'merriweather' ||
+      stored.fontFamily === 'inter' ||
+      stored.fontFamily === 'jakarta'
+        ? stored.fontFamily
+        : 'newsreader',
   };
 }
 

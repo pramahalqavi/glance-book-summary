@@ -19,10 +19,20 @@ export function BookCard({ book }: BookCardProps) {
     : 0;
 
   return (
-    <article className="group relative bg-white rounded-2xl border border-stone-200/80 shadow-xs hover:shadow-md hover:border-stone-300 transition-all duration-200 flex flex-col overflow-hidden">
+    <article
+      style={{
+        backgroundColor: 'var(--reader-surface)',
+        borderColor: 'var(--reader-border)',
+        color: 'var(--reader-text)',
+      }}
+      className="group relative rounded-2xl border shadow-xs hover:shadow-md transition-all duration-200 flex flex-col overflow-hidden"
+    >
       <Link to={`/book/${book.id}`} className="flex flex-col flex-1 focus:outline-none">
         {/* Cover */}
-        <div className="relative aspect-[5/6] bg-stone-100 overflow-hidden">
+        <div
+          style={{ backgroundColor: 'var(--reader-surface-muted)' }}
+          className="relative aspect-[5/6] overflow-hidden"
+        >
           <img
             src={book.coverUrl}
             alt={`${book.title} cover`}
@@ -51,20 +61,34 @@ export function BookCard({ book }: BookCardProps) {
             {book.categories.slice(0, 2).map((cat) => (
               <span
                 key={cat}
-                className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-stone-100 text-stone-600"
+                style={{
+                  backgroundColor: 'var(--reader-surface-muted)',
+                  color: 'var(--reader-muted)',
+                }}
+                className="text-[11px] font-medium px-2 py-0.5 rounded-full"
               >
                 {cat}
               </span>
             ))}
           </div>
 
-          <h3 className="font-serif-editorial text-lg font-bold text-slate-900 leading-snug group-hover:text-emerald-800 transition-colors line-clamp-2">
+          <h3 className="font-serif-editorial text-lg font-bold leading-snug line-clamp-2">
             {book.title}
           </h3>
-          <p className="text-sm text-stone-500 mt-0.5">{book.author}</p>
-          <p className="text-xs text-stone-600 mt-2 line-clamp-2 flex-1">{book.tagline}</p>
+          <p style={{ color: 'var(--reader-muted)' }} className="text-sm mt-0.5">
+            {book.author}
+          </p>
+          <p style={{ color: 'var(--reader-muted)' }} className="text-xs mt-2 line-clamp-2 flex-1">
+            {book.tagline}
+          </p>
 
-          <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between text-xs text-stone-500">
+          <div
+            style={{
+              borderColor: 'var(--reader-border)',
+              color: 'var(--reader-muted)',
+            }}
+            className="mt-4 pt-3 border-t flex items-center justify-between text-xs"
+          >
             <span className="inline-flex items-center gap-1">
               <Clock className="w-3.5 h-3.5" />
               {book.readTimeMinutes} min
@@ -86,11 +110,11 @@ export function BookCard({ book }: BookCardProps) {
           toggleBookmark(book.id);
         }}
         aria-label={saved ? `Remove ${book.title} from My Library` : `Save ${book.title} to My Library`}
-        className={`absolute top-3 right-3 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md transition-all shadow-sm cursor-pointer ${
-          saved
-            ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-            : 'bg-white/85 text-slate-700 hover:bg-white'
-        }`}
+        style={{
+          backgroundColor: saved ? 'var(--reader-accent)' : 'rgba(255, 255, 255, 0.88)',
+          color: saved ? '#ffffff' : '#1e293b',
+        }}
+        className="absolute top-3 right-3 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md transition-all shadow-sm cursor-pointer"
       >
         <Bookmark className={`w-4 h-4 ${saved ? 'fill-current' : ''}`} />
       </button>

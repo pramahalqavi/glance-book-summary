@@ -2,18 +2,59 @@
 @plugin "@tailwindcss/typography";
 
 @layer base {
-  :root {
+  :root,
+  .reader-theme-light {
     --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     --font-serif: "Newsreader", Georgia, Cambria, "Times New Roman", Times, serif;
+
+    --reader-bg: #fafaf9;
+    --reader-surface: #ffffff;
+    --reader-surface-muted: #f5f5f4;
+    --reader-text: #1c1917;
+    --reader-muted: #57534e;
+    --reader-border: #e7e5e4;
+    --reader-accent: #059669;
+    --reader-quote-bg: #f0fdf4;
+    --reader-quote-border: #10b981;
+    --reader-code-bg: #f5f5f4;
+  }
+
+  .reader-theme-sepia {
+    --reader-bg: #f4ecd8;
+    --reader-surface: #fbf6e9;
+    --reader-surface-muted: #ede1c5;
+    --reader-text: #3d2e1e;
+    --reader-muted: #78634a;
+    --reader-border: #e2d5b7;
+    --reader-accent: #b45309;
+    --reader-quote-bg: #ebe0c5;
+    --reader-quote-border: #d97706;
+    --reader-code-bg: #e9ddc2;
+  }
+
+  .reader-theme-dark {
+    --reader-bg: #0a0c10;
+    --reader-surface: #12161f;
+    --reader-surface-muted: #1b202c;
+    --reader-text: #e5e7eb;
+    --reader-muted: #9ca3af;
+    --reader-border: #222938;
+    --reader-accent: #34d399;
+    --reader-quote-bg: #0b1f1a;
+    --reader-quote-border: #10b981;
+    --reader-code-bg: #181c23;
   }
 
   html,
   body {
     font-family: var(--font-sans);
-    background-color: #fafaf9;
-    color: #0f172a;
+    background-color: var(--reader-bg);
+    color: var(--reader-text);
     -webkit-tap-highlight-color: transparent;
-    overscroll-behavior-y: none;
+  }
+
+  body {
+    overflow-x: clip;
   }
 }
 
@@ -45,13 +86,32 @@
 }
 
 /* Reader Markdown Typography & Theme Tokens */
+.reader-font-newsreader {
+  --reader-font-family: "Newsreader", Georgia, Cambria, "Times New Roman", Times, serif;
+}
+.reader-font-literata {
+  --reader-font-family: "Literata", Georgia, Cambria, "Times New Roman", Times, serif;
+}
+.reader-font-lora {
+  --reader-font-family: "Lora", Georgia, Cambria, "Times New Roman", Times, serif;
+}
+.reader-font-merriweather {
+  --reader-font-family: "Merriweather", Georgia, Cambria, "Times New Roman", Times, serif;
+}
+.reader-font-inter {
+  --reader-font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+.reader-font-jakarta {
+  --reader-font-family: "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
 .reader-prose {
-  font-family: var(--font-serif);
+  font-family: var(--reader-font-family, var(--font-serif));
   line-height: 1.75;
 }
 
 .reader-prose h2 {
-  font-family: var(--font-serif);
+  font-family: var(--reader-font-family, var(--font-serif));
   font-weight: 700;
   letter-spacing: -0.015em;
   margin-top: 1.25em;
@@ -97,6 +157,8 @@
   border-radius: 0 0.75rem 0.75rem 0;
   font-style: italic;
   break-inside: avoid;
+  background-color: var(--reader-quote-bg);
+  border-left-color: var(--reader-quote-border);
 }
 
 .reader-prose blockquote p:last-child {
@@ -108,51 +170,6 @@
   font-size: 0.88em;
   padding: 0.12em 0.36em;
   border-radius: 0.35rem;
-}
-
-/* Theme-specific prose styling */
-.reader-theme-light {
-  --reader-bg: #fafaf9;
-  --reader-surface: #ffffff;
-  --reader-text: #1c1917;
-  --reader-muted: #57534e;
-  --reader-border: #e7e5e4;
-  --reader-accent: #059669;
-  --reader-quote-bg: #f0fdf4;
-  --reader-quote-border: #10b981;
-  --reader-code-bg: #f5f5f4;
-}
-
-.reader-theme-sepia {
-  --reader-bg: #f4ecd8;
-  --reader-surface: #fbf6e9;
-  --reader-text: #3d2e1e;
-  --reader-muted: #78634a;
-  --reader-border: #e2d5b7;
-  --reader-accent: #b45309;
-  --reader-quote-bg: #ebe0c5;
-  --reader-quote-border: #d97706;
-  --reader-code-bg: #e9ddc2;
-}
-
-.reader-theme-dark {
-  --reader-bg: #000000;
-  --reader-surface: #0f1115;
-  --reader-text: #e5e7eb;
-  --reader-muted: #9ca3af;
-  --reader-border: #1f2937;
-  --reader-accent: #34d399;
-  --reader-quote-bg: #0b1f1a;
-  --reader-quote-border: #10b981;
-  --reader-code-bg: #181c23;
-}
-
-.reader-prose blockquote {
-  background-color: var(--reader-quote-bg);
-  border-left-color: var(--reader-quote-border);
-}
-
-.reader-prose code {
   background-color: var(--reader-code-bg);
 }
 
