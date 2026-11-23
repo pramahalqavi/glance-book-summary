@@ -10,7 +10,7 @@ type LibraryTab = 'saved' | 'in-progress' | 'finished';
 const PAGE_SIZE = 20;
 
 export function MyLibraryPage() {
-  const { books, bookmarks, progressMap } = useApp();
+  const { books, bookmarks, progressMap, removeProgress } = useApp();
   const [tab, setTab] = useState<LibraryTab>('saved');
   const [sortBy, setSortBy] = useState<BookSortOption>('default');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -161,7 +161,22 @@ export function MyLibraryPage() {
         <div className="space-y-6">
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5">
             {visibleBooks.map((book) => (
-              <BookCard key={book.id} book={book} />
+              <BookCard
+                key={book.id}
+                book={book}
+                onRemove={
+                  tab === 'in-progress' || tab === 'finished'
+                    ? () => removeProgress(book.id)
+                    : undefined
+                }
+                removeLabel={
+                  tab === 'in-progress'
+                    ? `Remove ${book.title} from Reading`
+                    : tab === 'finished'
+                    ? `Remove ${book.title} from Finished`
+                    : undefined
+                }
+              />
             ))}
           </div>
 

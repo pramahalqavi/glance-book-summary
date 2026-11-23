@@ -1,13 +1,15 @@
 import { Link } from 'react-router-dom';
-import { Bookmark, Clock, Layers, CheckCircle2 } from 'lucide-react';
+import { Bookmark, Clock, Layers, CheckCircle2, X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import type { BookCatalogItem } from '../types/book';
 
 interface BookCardProps {
   book: BookCatalogItem;
+  onRemove?: () => void;
+  removeLabel?: string;
 }
 
-export function BookCard({ book }: BookCardProps) {
+export function BookCard({ book, onRemove, removeLabel }: BookCardProps) {
   const { isBookmarked, toggleBookmark, getProgress } = useApp();
   const saved = isBookmarked(book.id);
   const progress = getProgress(book.id);
@@ -39,7 +41,7 @@ export function BookCard({ book }: BookCardProps) {
             loading="lazy"
             className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
           />
-          {progress?.completed && (
+          {progress?.completed && !onRemove && (
             <span className="absolute top-3 left-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-600/95 text-white text-[11px] font-semibold shadow-sm">
               <CheckCircle2 className="w-3.5 h-3.5" />
               Finished
@@ -105,6 +107,23 @@ export function BookCard({ book }: BookCardProps) {
           </div>
         </div>
       </Link>
+
+      {/* Optional Remove Button (Reading / Finished lists) */}
+      {onRemove && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onRemove();
+          }}
+          title={removeLabel ?? `Remove ${book.title}`}
+          aria-label={removeLabel ?? `Remove ${book.title}`}
+          className="absolute top-2 left-2 sm:top-3 sm:left-3 w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center bg-black/65 hover:bg-rose-600 text-white backdrop-blur-md transition-colors shadow-sm cursor-pointer"
+        >
+          <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+        </button>
+      )}
 
       {/* Bookmark Button */}
       <button

@@ -25,6 +25,7 @@ interface AppContextValue {
     bookId: string,
     patch: Partial<Omit<BookProgress, 'bookId' | 'lastReadAt'>>
   ) => void;
+  removeProgress: (bookId: string) => void;
   continueReadingBooks: Array<{ book: BookCatalogItem; progress: BookProgress }>;
 }
 
@@ -127,6 +128,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const removeProgress = useCallback((bookId: string) => {
+    setProgressMap((prev) => {
+      if (!(bookId in prev)) return prev;
+      const next = { ...prev };
+      delete next[bookId];
+      saveProgressMap(next);
+      return next;
+    });
+  }, []);
+
   const continueReadingBooks = useMemo(() => {
     return Object.values(progressMap)
       .filter((p) => !p.completed)
@@ -151,6 +162,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       progressMap,
       getProgress,
       updateProgress,
+      removeProgress,
       continueReadingBooks,
     }),
     [
@@ -165,6 +177,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       progressMap,
       getProgress,
       updateProgress,
+      removeProgress,
       continueReadingBooks,
     ]
   );
