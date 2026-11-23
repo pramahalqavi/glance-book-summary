@@ -10,6 +10,7 @@
     "seed": "node scripts/seed-firestore.mjs"
   },
   "dependencies": {
+    "@browsermt/bergamot-translator": "^0.4.9",
     "firebase": "^11.4.0",
     "fuse.js": "^7.1.0",
     "lucide-react": "^0.475.0",

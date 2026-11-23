@@ -91,7 +91,7 @@ export function SwipeChapterView({
 
   useLayoutEffect(() => {
     measurePages();
-  }, [measurePages, chapter.index, fontSize, fontFamily]);
+  }, [measurePages, chapter.index, chapter.title, chapter.contentMarkdown, fontSize, fontFamily]);
 
   useEffect(() => {
     const vp = viewportRef.current;

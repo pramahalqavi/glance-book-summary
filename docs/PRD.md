@@ -17,6 +17,7 @@ The entire platform is designed to run on a **\$0 free-tier cloud architecture**
 - Allow users to switch between **Scroll Mode** and **Swipe (Book) Mode** at any time.
 - Enforce **horizontal page swiping** for chapter-to-chapter navigation in both reading modes.
 - Support offline reading of previously opened summaries and preserve reading progress.
+- Support client-side, offline-capable **English ↔ Bahasa Indonesia** translation without storing duplicate translated copies in Firestore.
 - Stay strictly within **Cloudflare Pages** and **Firebase Spark** free-tier limits.
 
 ### Non-Goals (Out of Scope for MVP)
@@ -78,11 +79,27 @@ Users can choose their preferred reading mode in the Reader Settings menu (persi
   - Theme: **Light**, **Sepia**, and **Dark** (OLED-friendly).
 - **Rich Text Formatting:** Chapter bodies stored in Markdown supporting headings, bold/italic text, bullet lists, and styled callout/quote blocks.
 
-### 4.4 Reading Progress, Bookmarks & Preferences
+### 4.4 Offline Translation (English ↔ Bahasa Indonesia)
+Each book is stored in Firestore in a **single source language** (`en` or `id`) to keep documents small and avoid duplicating content.
+
+- **Contextual Reader Toggle:**
+  - If the book's source language is **English (`en`)**, Reader Options displays a **"Translate to Bahasa Indonesia"** toggle.
+  - If the book's source language is **Bahasa Indonesia (`id`)**, Reader Options displays a **"Translate to English"** toggle.
+  - Users can switch back to **Original** at any time.
+- **Offline Language Packs (`@browsermt/bergamot-translator`):**
+  - Powered by Mozilla's lightweight `firefox-translations-models` (`enid` ~14–21 MB, `iden` ~14.5 MB) running client-side via WebAssembly in a Web Worker.
+  - **First-Time Download Flow:** When the user first enables translation for a direction (`en → id` or `id → en`), Glance prompts to download the language pack with a live progress bar, then caches the WASM engine and model files locally (`Cache API` / `IndexedDB`) for instant offline reuse.
+  - **Pack Management:** Users can view download status and delete cached language packs in Settings to free up device storage.
+- **Chapter-Level Translation & Caching:**
+  - Translates the active chapter on demand (with optional background prefetch for the next chapter) and caches translated chapter text in `IndexedDB` (`bookId:targetLang:chapterIndex`).
+  - Preserves Markdown formatting (headings, bold/italic, lists, blockquotes) by translating text nodes/HTML blocks rather than raw Markdown syntax.
+  - Automatically re-calculates pagination in **Swipe Mode** whenever translation is toggled, since translated text length may differ from the source.
+
+### 4.5 Reading Progress, Bookmarks & Preferences
 - **Local-First Persistence (MVP):** Automatically saves reading progress (book ID, chapter index, page/scroll offset), saved bookmarks, and reader preferences (mode, theme, font size) in `localStorage` / IndexedDB.
 - **Optional Cloud Sync (Phase 2 / Post-MVP):** Sign in via Firebase Auth (Google / Email) to sync progress, bookmarks, and preferences across devices.
 
-### 4.5 PWA & Offline Support
+### 4.6 PWA & Offline Support
 - Valid `manifest.webmanifest` and app icons supporting install prompts on **iOS** (`apple-touch-icon`, `apple-mobile-web-app-capable`), **Android**, and **Desktop** (Chrome/Edge standalone window).
 - Service Worker caches the app shell and assets for instant loading.
 - Firestore IndexedDB persistence caches opened book summaries so users can re-read them offline.
@@ -97,6 +114,8 @@ Users can choose their preferred reading mode in the Reader Settings menu (persi
 | **PWA** | `vite-plugin-pwa` (Workbox) | Automated service worker and manifest generation |
 | **Markdown** | `react-markdown` | Clean rendering of chapter content |
 | **Search** | `Fuse.js` | Instant client-side fuzzy search with zero DB query cost |
+| **Offline Translation** | `@browsermt/bergamot-translator` + Mozilla `enid`/`iden` models | Runs 100% client-side in WebAssembly (Web Worker); ~15 MB per direction; \$0 API cost |
+| **Model Hosting** | **Cloudflare Pages** (`/public/models/enid/`, `/public/models/iden/`, WASM binary) | Each model file is under Cloudflare Pages' 25 MiB per-file limit, served with unlimited free bandwidth |
 | **Hosting** | **Cloudflare Pages** (Free Tier) | Unlimited static bandwidth, global CDN, commercial use allowed |
 | **Cloud DB** | **Firebase Cloud Firestore** (Spark Free Tier) | 1 GiB storage, 50k reads/day, offline cache, never pauses |
 | **Cover Images** | Compressed `.webp` in `/public/covers/` or **Cloudflare R2** | Avoids Firebase Storage Blaze-plan requirement; \$0 egress |
@@ -113,6 +132,7 @@ To stay well within Firestore's **50,000 free reads/day**, documents are grouped
          "id": "atomic-habits",
          "title": "Atomic Habits",
          "author": "James Clear",
+         "language": "en",
          "coverUrl": "/covers/atomic-habits.webp",
          "categories": ["Productivity", "Psychology"],
          "readTimeMinutes": 15,
@@ -130,6 +150,7 @@ To stay well within Firestore's **50,000 free reads/day**, documents are grouped
      "id": "atomic-habits",
      "title": "Atomic Habits",
      "author": "James Clear",
+     "language": "en",
      "overview": "Short synopsis of the book...",
      "keyTakeaways": ["Takeaway 1", "Takeaway 2"],
      "chapters": [
@@ -163,7 +184,7 @@ To stay well within Firestore's **50,000 free reads/day**, documents are grouped
 1. **Phase 1 — Foundation:** Scaffold Vite + React + Tailwind + PWA, connect Firebase Firestore, set up Firestore rules, and create a seed script with 3–5 sample book summaries.
 2. **Phase 2 — Discovery & Details:** Build Home/Library screen, client-side search, category filters, and Book Detail screen.
 3. **Phase 3 — Dual-Mode Reader:** Implement outer horizontal chapter pager, Scroll Mode, dynamic-pagination Swipe Mode, HUD controls, and Theme/Typography settings.
-4. **Phase 4 — Offline & Deployment:** Enable Firestore offline persistence, local progress/bookmark persistence, PWA install polish, and deploy to Cloudflare Pages.
+4. **Phase 4 — Offline Translation, Caching & Deployment:** Bundle/host Bergamot WASM + `enid`/`iden` models on Cloudflare Pages, implement contextual `en ↔ id` translation with download progress & local caching, enable Firestore offline persistence, PWA install polish, and deploy to Cloudflare Pages.
 5. **Phase 5 — Optional Enhancements:** Firebase Auth for cross-device sync and a simple admin upload utility for adding new book summaries.
 
 ---

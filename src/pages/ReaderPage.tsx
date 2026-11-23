@@ -5,17 +5,28 @@ import {
   Bookmark,
   ChevronLeft,
   ChevronRight,
+  Languages,
   List,
+  Loader2,
   PanelLeft,
   Settings2,
 } from 'lucide-react';
 import { fetchBookSummary } from '../lib/repository';
+import {
+  deletePack,
+  downloadPack,
+  getAllPackStatuses,
+  getDirectionForSource,
+  getTargetLanguage,
+  translateChapter,
+  type DownloadProgress,
+} from '../lib/translator';
 import { useApp } from '../context/AppContext';
 import { ScrollChapterView } from '../components/reader/ScrollChapterView';
 import { SwipeChapterView } from '../components/reader/SwipeChapterView';
 import { ReaderSettingsSheet } from '../components/reader/ReaderSettingsSheet';
 import { TocDrawer } from '../components/reader/TocDrawer';
-import type { BookSummary } from '../types/book';
+import type { BookLanguage, BookSummary, Chapter, TranslationDirection } from '../types/book';
 
 export function ReaderPage() {
   const { bookId } = useParams<{ bookId: string }>();
@@ -54,7 +65,27 @@ export function ReaderPage() {
   const [tocOpen, setTocOpen] = useState(false);
   const [desktopTocPinned, setDesktopTocPinned] = useState(false);
 
+  // Offline Translation State
+  const [translateEnabled, setTranslateEnabled] = useState(false);
+  const [translatedChapters, setTranslatedChapters] = useState<
+    Record<number, { title: string; contentMarkdown: string }>
+  >({});
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translationError, setTranslationError] = useState<string | null>(null);
+  const [packStatuses, setPackStatuses] = useState<Record<TranslationDirection, boolean>>({
+    enid: false,
+    iden: false,
+  });
+  const [downloadingDirection, setDownloadingDirection] =
+    useState<TranslationDirection | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
+
   const jumpToLastPageRef = useRef(false);
+
+  // Load cached offline pack statuses on mount
+  useEffect(() => {
+    getAllPackStatuses().then(setPackStatuses).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     if (!bookId) return;
@@ -99,6 +130,135 @@ export function ReaderPage() {
 
   const chapterCount = summary?.chapters.length ?? 0;
   const currentChapter = summary?.chapters[chapterIndex] ?? null;
+  const sourceLang: BookLanguage = summary?.language ?? 'en';
+  const targetLang: BookLanguage = getTargetLanguage(sourceLang);
+  const activeDirection: TranslationDirection = getDirectionForSource(sourceLang);
+
+  // Reset per-book translated chapters when switching books
+  useEffect(() => {
+    setTranslateEnabled(false);
+    setTranslatedChapters({});
+    setTranslationError(null);
+  }, [bookId]);
+
+  // Translate active chapter when translation is enabled + background prefetch next chapter
+  useEffect(() => {
+    if (!translateEnabled || !bookId || !summary || !currentChapter) return;
+    if (!packStatuses[activeDirection]) return;
+
+    let cancelled = false;
+
+    const run = async () => {
+      if (!translatedChapters[chapterIndex]) {
+        setIsTranslating(true);
+        setTranslationError(null);
+        try {
+          const result = await translateChapter(bookId, currentChapter, sourceLang, targetLang);
+          if (!cancelled) {
+            setTranslatedChapters((prev) => ({ ...prev, [chapterIndex]: result }));
+          }
+        } catch (err) {
+          if (!cancelled) {
+            setTranslationError(
+              err instanceof Error ? err.message : 'Translation failed. Please try again.'
+            );
+            setTranslateEnabled(false);
+          }
+        } finally {
+          if (!cancelled) setIsTranslating(false);
+        }
+      }
+
+      // Silently prefetch next chapter for seamless swiping
+      const nextCh = summary.chapters[chapterIndex + 1];
+      if (nextCh && !translatedChapters[nextCh.index] && !cancelled) {
+        translateChapter(bookId, nextCh, sourceLang, targetLang)
+          .then((res) => {
+            if (!cancelled) {
+              setTranslatedChapters((prev) => ({ ...prev, [nextCh.index]: res }));
+            }
+          })
+          .catch(() => undefined);
+      }
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    translateEnabled,
+    bookId,
+    summary,
+    currentChapter,
+    chapterIndex,
+    sourceLang,
+    targetLang,
+    activeDirection,
+    packStatuses,
+    translatedChapters,
+  ]);
+
+  const handleDownloadPack = useCallback(async (dir: TranslationDirection) => {
+    setTranslationError(null);
+    setDownloadingDirection(dir);
+    setDownloadProgress({ percent: 0, receivedBytes: 0, totalBytes: 1, stage: 'downloading' });
+    try {
+      await downloadPack(dir, (p) => setDownloadProgress(p));
+      const updated = await getAllPackStatuses();
+      setPackStatuses(updated);
+      return true;
+    } catch (err) {
+      setTranslationError(
+        err instanceof Error ? err.message : 'Failed to download offline language pack.'
+      );
+      return false;
+    } finally {
+      setDownloadingDirection(null);
+      setDownloadProgress(null);
+    }
+  }, []);
+
+  const handleToggleTranslate = useCallback(
+    async (enabled: boolean) => {
+      setTranslationError(null);
+      if (!enabled) {
+        setTranslateEnabled(false);
+        return;
+      }
+      if (!packStatuses[activeDirection]) {
+        const ok = await handleDownloadPack(activeDirection);
+        if (!ok) return;
+      }
+      setTranslateEnabled(true);
+    },
+    [packStatuses, activeDirection, handleDownloadPack]
+  );
+
+  const handleDeletePack = useCallback(
+    async (dir: TranslationDirection) => {
+      await deletePack(dir);
+      const updated = await getAllPackStatuses();
+      setPackStatuses(updated);
+      if (dir === activeDirection) {
+        setTranslateEnabled(false);
+        setTranslatedChapters({});
+      }
+    },
+    [activeDirection]
+  );
+
+  const displayChapter: Chapter | null = useMemo(() => {
+    if (!currentChapter) return null;
+    if (!translateEnabled) return currentChapter;
+    const translated = translatedChapters[currentChapter.index];
+    if (!translated) return currentChapter;
+    return {
+      ...currentChapter,
+      title: translated.title,
+      contentMarkdown: translated.contentMarkdown,
+    };
+  }, [currentChapter, translateEnabled, translatedChapters]);
 
   const goToChapter = useCallback(
     (nextIndex: number, dir: 'none' | 'next' | 'prev' = 'none', jumpToLast = false) => {
@@ -224,7 +384,7 @@ export function ReaderPage() {
     );
   }
 
-  if (!summary || !currentChapter || !bookId) {
+  if (!summary || !currentChapter || !displayChapter || !bookId) {
     return (
       <div className="h-[100dvh] flex flex-col items-center justify-center p-6 text-center bg-[#fafaf9]">
         <h1 className="font-serif-editorial text-2xl font-bold text-slate-900">
@@ -287,11 +447,33 @@ export function ReaderPage() {
             </Link>
             <div className="min-w-0">
               <p className="text-sm font-semibold truncate">{summary.title}</p>
-              <p className="text-[11px] opacity-60 truncate">{currentChapter.title}</p>
+              <p className="text-[11px] opacity-60 truncate">{displayChapter.title}</p>
             </div>
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
+            {/* Active Translation Pill */}
+            {translateEnabled && (
+              <button
+                type="button"
+                onClick={() => setSettingsOpen(true)}
+                title="Viewing translated chapter — tap to change language"
+                style={{
+                  backgroundColor: 'var(--reader-quote-bg)',
+                  borderColor: 'var(--reader-accent)',
+                  color: 'var(--reader-accent)',
+                }}
+                className="h-8 px-2.5 rounded-full border text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer"
+              >
+                {isTranslating ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Languages className="w-3 h-3" />
+                )}
+                <span>{targetLang.toUpperCase()}</span>
+              </button>
+            )}
+
             {/* Desktop Pinned TOC Sidebar Toggle */}
             <button
               type="button"
@@ -391,6 +573,26 @@ export function ReaderPage() {
 
         {/* Active Chapter Surface */}
         <div className="flex-1 min-h-0 h-full relative overflow-hidden">
+          {/* Translating Indicator Toast */}
+          {isTranslating && (
+            <div
+              style={{
+                backgroundColor: 'var(--reader-surface)',
+                borderColor: 'var(--reader-border)',
+                color: 'var(--reader-text)',
+              }}
+              className="fixed top-16 left-1/2 -translate-x-1/2 z-30 mt-2 px-4 py-2 rounded-full border shadow-md inline-flex items-center gap-2 text-xs font-semibold"
+            >
+              <Loader2
+                style={{ color: 'var(--reader-accent)' }}
+                className="w-3.5 h-3.5 animate-spin"
+              />
+              <span>
+                Translating to {targetLang === 'id' ? 'Bahasa Indonesia' : 'English'}...
+              </span>
+            </div>
+          )}
+
           {/* Desktop Subtle Hoverable Side Margin Arrows */}
           <button
             type="button"
@@ -423,7 +625,7 @@ export function ReaderPage() {
           <div key={`${preferences.readingMode}-${chapterIndex}`} className={`h-full w-full ${slideClass}`}>
             {preferences.readingMode === 'scroll' ? (
               <ScrollChapterView
-                chapter={currentChapter}
+                chapter={displayChapter}
                 chapterCount={chapterCount}
                 fontSize={preferences.fontSize}
                 fontFamily={preferences.fontFamily}
@@ -440,7 +642,7 @@ export function ReaderPage() {
               />
             ) : (
               <SwipeChapterView
-                chapter={currentChapter}
+                chapter={displayChapter}
                 chapterCount={chapterCount}
                 fontSize={preferences.fontSize}
                 fontFamily={preferences.fontFamily}
@@ -529,6 +731,20 @@ export function ReaderPage() {
         onClose={() => setSettingsOpen(false)}
         preferences={preferences}
         onChange={updatePreferences}
+        sourceLang={sourceLang}
+        translateEnabled={translateEnabled}
+        isTranslating={isTranslating}
+        translationError={translationError}
+        onToggleTranslate={handleToggleTranslate}
+        packStatuses={packStatuses}
+        downloadingDirection={downloadingDirection}
+        downloadProgress={downloadProgress}
+        onDownloadPack={(dir) => {
+          void handleDownloadPack(dir);
+        }}
+        onDeletePack={(dir) => {
+          void handleDeletePack(dir);
+        }}
       />
 
       {/* Mobile / Tablet TOC Drawer */}

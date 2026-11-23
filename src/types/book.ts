@@ -1,7 +1,11 @@
+export type BookLanguage = 'en' | 'id';
+export type TranslationDirection = 'enid' | 'iden';
+
 export interface BookCatalogItem {
   id: string;
   title: string;
   author: string;
+  language?: BookLanguage;
   coverUrl: string;
   categories: string[];
   readTimeMinutes: number;
@@ -24,6 +28,7 @@ export interface BookSummary {
   id: string;
   title: string;
   author: string;
+  language?: BookLanguage;
   coverUrl?: string;
   categories?: string[];
   readTimeMinutes?: number;

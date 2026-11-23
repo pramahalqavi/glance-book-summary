@@ -37,7 +37,16 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2}'],
+        globIgnores: ['models/**', 'bergamot/**'],
         runtimeCaching: [
+          {
+            urlPattern: /\/(bergamot|models)\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'glance-translation-packs-v1',
+              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 },
+            },
+          },
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: 'CacheFirst',
