@@ -1,4 +1,14 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { onAuthStateChanged, type User } from 'firebase/auth';
+import { auth, db, isFirebaseConfigured } from '../lib/firebase';
 import { fetchCatalog, getDataSource, type DataSource } from '../lib/repository';
 import {
   loadBookmarks,
@@ -8,7 +18,22 @@ import {
   savePreferences,
   saveProgressMap,
 } from '../lib/storage';
+import {
+  areUserDataEqual,
+  formatAuthError,
+  getLastSyncedUid,
+  loadCloudUserData,
+  mergeUserData,
+  saveCloudUserData,
+  setLastSyncedUid,
+  signInWithGooglePopup,
+  signOutGoogle,
+  subscribeToCloudUserData,
+  type UserSyncData,
+} from '../lib/userSync';
 import type { BookCatalogItem, BookProgress, ReaderPreferences } from '../types/book';
+
+export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error';
 
 interface AppContextValue {
   books: BookCatalogItem[];
@@ -27,6 +52,16 @@ interface AppContextValue {
   ) => void;
   removeProgress: (bookId: string) => void;
   continueReadingBooks: Array<{ book: BookCatalogItem; progress: BookProgress }>;
+  // Optional Google OAuth & Cloud Library Sync
+  isAuthAvailable: boolean;
+  user: User | null;
+  authLoading: boolean;
+  authBusy: boolean;
+  authError: string | null;
+  clearAuthError: () => void;
+  syncStatus: SyncStatus;
+  signInWithGoogle: () => Promise<void>;
+  signOutUser: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -39,8 +74,213 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [progressMap, setProgressMap] = useState<Record<string, BookProgress>>(() =>
     loadProgressMap()
   );
+
+  const isAuthAvailable = Boolean(isFirebaseConfigured && auth && db);
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState<boolean>(isAuthAvailable);
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
+
   const dataSource = getDataSource();
 
+  // Refs for latest local state & sync lifecycle coordination
+  const preferencesRef = useRef<ReaderPreferences>(preferences);
+  const bookmarksRef = useRef<string[]>(bookmarks);
+  const progressMapRef = useRef<Record<string, BookProgress>>(progressMap);
+  const userRef = useRef<User | null>(null);
+  const syncReadyRef = useRef(false);
+  const hasPendingWriteRef = useRef(false);
+  const writeTimerRef = useRef<number | null>(null);
+  const sessionTokenRef = useRef(0);
+
+  preferencesRef.current = preferences;
+  bookmarksRef.current = bookmarks;
+  progressMapRef.current = progressMap;
+
+  const getCurrentLocalData = useCallback(
+    (): UserSyncData => ({
+      preferences: preferencesRef.current,
+      bookmarks: bookmarksRef.current,
+      progress: progressMapRef.current,
+    }),
+    []
+  );
+
+  const applySyncedData = useCallback((data: UserSyncData) => {
+    preferencesRef.current = data.preferences;
+    bookmarksRef.current = data.bookmarks;
+    progressMapRef.current = data.progress;
+    savePreferences(data.preferences);
+    saveBookmarks(data.bookmarks);
+    saveProgressMap(data.progress);
+    setPreferences(data.preferences);
+    setBookmarks(data.bookmarks);
+    setProgressMap(data.progress);
+  }, []);
+
+  const flushCloudSave = useCallback(async () => {
+    if (writeTimerRef.current !== null) {
+      window.clearTimeout(writeTimerRef.current);
+      writeTimerRef.current = null;
+    }
+    const activeUser = userRef.current;
+    if (!activeUser || !syncReadyRef.current || !hasPendingWriteRef.current) {
+      return;
+    }
+    hasPendingWriteRef.current = false;
+    setSyncStatus('syncing');
+    try {
+      await saveCloudUserData(activeUser.uid, getCurrentLocalData());
+      if (userRef.current?.uid === activeUser.uid) {
+        setSyncStatus('synced');
+      }
+    } catch (err) {
+      console.warn('[Glance] Cloud sync write failed:', err);
+      if (userRef.current?.uid === activeUser.uid) {
+        setSyncStatus('error');
+      }
+    }
+  }, [getCurrentLocalData]);
+
+  const scheduleCloudSave = useCallback(
+    (delayMs = 350) => {
+      if (!userRef.current || !syncReadyRef.current) return;
+      hasPendingWriteRef.current = true;
+      setSyncStatus('syncing');
+      if (writeTimerRef.current !== null) {
+        window.clearTimeout(writeTimerRef.current);
+      }
+      writeTimerRef.current = window.setTimeout(() => {
+        void flushCloudSave();
+      }, delayMs);
+    },
+    [flushCloudSave]
+  );
+
+  // Flush pending cloud writes when leaving/hiding the tab
+  useEffect(() => {
+    const handleVisibilityOrHide = () => {
+      if (document.visibilityState === 'hidden' && hasPendingWriteRef.current) {
+        void flushCloudSave();
+      }
+    };
+    const handlePageHide = () => {
+      if (hasPendingWriteRef.current) {
+        void flushCloudSave();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityOrHide);
+    window.addEventListener('pagehide', handlePageHide);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityOrHide);
+      window.removeEventListener('pagehide', handlePageHide);
+    };
+  }, [flushCloudSave]);
+
+  // Observe Firebase Auth state & sync `users/{uid}`
+  useEffect(() => {
+    if (!auth || !db) {
+      setAuthLoading(false);
+      return;
+    }
+
+    let unsubscribeSnapshot: (() => void) | null = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (nextUser) => {
+      const token = ++sessionTokenRef.current;
+
+      if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
+        unsubscribeSnapshot = null;
+      }
+      if (writeTimerRef.current !== null) {
+        window.clearTimeout(writeTimerRef.current);
+        writeTimerRef.current = null;
+      }
+      hasPendingWriteRef.current = false;
+      syncReadyRef.current = false;
+      userRef.current = nextUser;
+      setUser(nextUser);
+      setAuthLoading(false);
+
+      if (!nextUser) {
+        setSyncStatus('idle');
+        return;
+      }
+
+      setSyncStatus('syncing');
+      try {
+        const cloudData = await loadCloudUserData(nextUser.uid);
+        if (sessionTokenRef.current !== token) return;
+
+        const localData = getCurrentLocalData();
+        const isFreshSignIn = getLastSyncedUid() !== nextUser.uid;
+
+        let resolved: UserSyncData;
+        let shouldPushToCloud = false;
+
+        if (isFreshSignIn) {
+          resolved = mergeUserData(localData, cloudData);
+          shouldPushToCloud = !cloudData || !areUserDataEqual(resolved, cloudData);
+        } else if (cloudData) {
+          resolved = cloudData;
+          shouldPushToCloud = false;
+        } else {
+          resolved = mergeUserData(localData, null);
+          shouldPushToCloud = true;
+        }
+
+        if (!areUserDataEqual(localData, resolved)) {
+          applySyncedData(resolved);
+        }
+        setLastSyncedUid(nextUser.uid);
+
+        if (shouldPushToCloud) {
+          await saveCloudUserData(nextUser.uid, resolved);
+          if (sessionTokenRef.current !== token) return;
+        }
+
+        syncReadyRef.current = true;
+        setSyncStatus('synced');
+
+        unsubscribeSnapshot = subscribeToCloudUserData(
+          nextUser.uid,
+          (remoteData) => {
+            if (sessionTokenRef.current !== token || hasPendingWriteRef.current) return;
+            if (!areUserDataEqual(getCurrentLocalData(), remoteData)) {
+              applySyncedData(remoteData);
+            }
+            setSyncStatus('synced');
+          },
+          (err) => {
+            console.warn('[Glance] Live cloud sync listener error:', err);
+            if (sessionTokenRef.current === token) {
+              setSyncStatus('error');
+            }
+          }
+        );
+      } catch (err) {
+        console.warn('[Glance] Initial cloud sync failed:', err);
+        if (sessionTokenRef.current === token) {
+          syncReadyRef.current = true;
+          setSyncStatus('error');
+        }
+      }
+    });
+
+    return () => {
+      sessionTokenRef.current += 1;
+      unsubscribeAuth();
+      if (unsubscribeSnapshot) unsubscribeSnapshot();
+      if (writeTimerRef.current !== null) {
+        window.clearTimeout(writeTimerRef.current);
+        writeTimerRef.current = null;
+      }
+    };
+  }, [applySyncedData, getCurrentLocalData]);
+
+  // Fetch catalog
   useEffect(() => {
     let active = true;
     fetchCatalog()
@@ -58,6 +298,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Apply active theme class + PWA status bar color
   useEffect(() => {
     const root = document.documentElement;
     root.classList.remove('reader-theme-light', 'reader-theme-sepia', 'reader-theme-dark');
@@ -75,28 +316,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [preferences.theme]);
 
-  const updatePreferences = useCallback((patch: Partial<ReaderPreferences>) => {
-    setPreferences((prev) => {
-      const next = { ...prev, ...patch };
-      savePreferences(next);
-      return next;
-    });
-  }, []);
+  const updatePreferences = useCallback(
+    (patch: Partial<ReaderPreferences>) => {
+      setPreferences((prev) => {
+        const next = { ...prev, ...patch };
+        preferencesRef.current = next;
+        savePreferences(next);
+        return next;
+      });
+      scheduleCloudSave(350);
+    },
+    [scheduleCloudSave]
+  );
 
   const isBookmarked = useCallback(
     (bookId: string) => bookmarks.includes(bookId),
     [bookmarks]
   );
 
-  const toggleBookmark = useCallback((bookId: string) => {
-    setBookmarks((prev) => {
-      const next = prev.includes(bookId)
-        ? prev.filter((id) => id !== bookId)
-        : [bookId, ...prev];
-      saveBookmarks(next);
-      return next;
-    });
-  }, []);
+  const toggleBookmark = useCallback(
+    (bookId: string) => {
+      setBookmarks((prev) => {
+        const next = prev.includes(bookId)
+          ? prev.filter((id) => id !== bookId)
+          : [bookId, ...prev];
+        bookmarksRef.current = next;
+        saveBookmarks(next);
+        return next;
+      });
+      scheduleCloudSave(300);
+    },
+    [scheduleCloudSave]
+  );
 
   const getProgress = useCallback(
     (bookId: string) => progressMap[bookId],
@@ -105,6 +356,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const updateProgress = useCallback(
     (bookId: string, patch: Partial<Omit<BookProgress, 'bookId' | 'lastReadAt'>>) => {
+      let isHighPriorityChange = Boolean(patch.completed);
       setProgressMap((prev) => {
         const existing = prev[bookId] ?? {
           bookId,
@@ -114,6 +366,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           completed: false,
           lastReadAt: Date.now(),
         };
+        if (
+          patch.chapterIndex !== undefined &&
+          patch.chapterIndex !== existing.chapterIndex
+        ) {
+          isHighPriorityChange = true;
+        }
         const nextEntry: BookProgress = {
           ...existing,
           ...patch,
@@ -121,22 +379,59 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           lastReadAt: Date.now(),
         };
         const next = { ...prev, [bookId]: nextEntry };
+        progressMapRef.current = next;
         saveProgressMap(next);
         return next;
       });
+      scheduleCloudSave(isHighPriorityChange ? 450 : 1800);
     },
-    []
+    [scheduleCloudSave]
   );
 
-  const removeProgress = useCallback((bookId: string) => {
-    setProgressMap((prev) => {
-      if (!(bookId in prev)) return prev;
-      const next = { ...prev };
-      delete next[bookId];
-      saveProgressMap(next);
-      return next;
-    });
+  const removeProgress = useCallback(
+    (bookId: string) => {
+      setProgressMap((prev) => {
+        if (!(bookId in prev)) return prev;
+        const next = { ...prev };
+        delete next[bookId];
+        progressMapRef.current = next;
+        saveProgressMap(next);
+        return next;
+      });
+      scheduleCloudSave(300);
+    },
+    [scheduleCloudSave]
+  );
+
+  const clearAuthError = useCallback(() => setAuthError(null), []);
+
+  const signInWithGoogle = useCallback(async () => {
+    setAuthError(null);
+    setAuthBusy(true);
+    try {
+      await signInWithGooglePopup();
+    } catch (err) {
+      const msg = formatAuthError(err);
+      if (msg) setAuthError(msg);
+    } finally {
+      setAuthBusy(false);
+    }
   }, []);
+
+  const signOutUser = useCallback(async () => {
+    setAuthError(null);
+    setAuthBusy(true);
+    try {
+      await flushCloudSave();
+      setLastSyncedUid(null);
+      await signOutGoogle();
+    } catch (err) {
+      const msg = formatAuthError(err);
+      if (msg) setAuthError(msg);
+    } finally {
+      setAuthBusy(false);
+    }
+  }, [flushCloudSave]);
 
   const continueReadingBooks = useMemo(() => {
     return Object.values(progressMap)
@@ -164,6 +459,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateProgress,
       removeProgress,
       continueReadingBooks,
+      isAuthAvailable,
+      user,
+      authLoading,
+      authBusy,
+      authError,
+      clearAuthError,
+      syncStatus,
+      signInWithGoogle,
+      signOutUser,
     }),
     [
       books,
@@ -179,6 +483,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateProgress,
       removeProgress,
       continueReadingBooks,
+      isAuthAvailable,
+      user,
+      authLoading,
+      authBusy,
+      authError,
+      clearAuthError,
+      syncStatus,
+      signInWithGoogle,
+      signOutUser,
     ]
   );
 

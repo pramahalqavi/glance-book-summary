@@ -38,6 +38,7 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2}'],
         globIgnores: ['models/**', 'bergamot/**'],
+        navigateFallbackDenylist: [/^\/__\/auth/],
         runtimeCaching: [
           {
             urlPattern: /\/(bergamot|models)\/.*/i,
@@ -72,7 +73,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          firebase: ['firebase/app', 'firebase/firestore'],
+          firebase: ['firebase/app', 'firebase/firestore', 'firebase/auth'],
           markdown: ['react-markdown', 'remark-gfm'],
         },
       },

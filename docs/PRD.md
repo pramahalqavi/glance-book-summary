@@ -95,9 +95,12 @@ Each book is stored in Firestore in a **single source language** (`en` or `id`) 
   - Preserves Markdown formatting (headings, bold/italic, lists, blockquotes) by translating text nodes/HTML blocks rather than raw Markdown syntax.
   - Automatically re-calculates pagination in **Swipe Mode** whenever translation is toggled, since translated text length may differ from the source.
 
-### 4.5 Reading Progress, Bookmarks & Preferences
-- **Local-First Persistence (MVP):** Automatically saves reading progress (book ID, chapter index, page/scroll offset), saved bookmarks, and reader preferences (mode, theme, font size) in `localStorage` / IndexedDB.
-- **Optional Cloud Sync (Phase 2 / Post-MVP):** Sign in via Firebase Auth (Google / Email) to sync progress, bookmarks, and preferences across devices.
+### 4.5 Reading Progress, Bookmarks & Optional Google OAuth Sync
+- **Guest-First Local Persistence:** Users can browse, read, bookmark books, track progress, and configure reader preferences (`readingMode`, `theme`, `fontSize`, `fontFamily`) immediately with zero login wall—saved locally in `localStorage`.
+- **Optional Google Sign-In (Firebase Authentication):**
+  - Users can optionally sign in with **Google OAuth** (`signInWithPopup`) from the top header or **My Library** to sync their library across mobile and desktop devices.
+  - **Seamless Merge on Sign-In:** Local bookmarks, reading progress, and preferences are merged with the cloud `users/{uid}` document (union of bookmarks, latest `lastReadAt` per book for progress, cloud-preferred settings if present) so guest data is never lost.
+  - **Live Cross-Device Sync & Offline Queue:** Uses a single Firestore document (`users/{uid}`) with debounced writes and Firestore IndexedDB offline persistence so changes sync automatically across devices and queue while offline.
 
 ### 4.6 PWA & Offline Support
 - Valid `manifest.webmanifest` and app icons supporting install prompts on **iOS** (`apple-touch-icon`, `apple-mobile-web-app-capable`), **Android**, and **Desktop** (Chrome/Edge standalone window).
@@ -118,6 +121,7 @@ Each book is stored in Firestore in a **single source language** (`en` or `id`) 
 | **Model Hosting** | **Cloudflare Pages** (`/public/models/enid/`, `/public/models/iden/`, WASM binary) | Each model file is under Cloudflare Pages' 25 MiB per-file limit, served with unlimited free bandwidth |
 | **Hosting** | **Cloudflare Pages** (Free Tier) | Unlimited static bandwidth, global CDN, commercial use allowed |
 | **Cloud DB** | **Firebase Cloud Firestore** (Spark Free Tier) | 1 GiB storage, 50k reads/day, offline cache, never pauses |
+| **Authentication** | **Firebase Authentication** (Google OAuth) | Free unlimited Google Sign-In; enables cross-device library sync via `users/{uid}` |
 | **Cover Images** | Compressed `.webp` in `/public/covers/` or **Cloudflare R2** | Avoids Firebase Storage Blaze-plan requirement; \$0 egress |
 
 ### 5.1 Firestore Data Model (Read-Quota Optimized)
@@ -163,8 +167,8 @@ To stay well within Firestore's **50,000 free reads/day**, documents are grouped
    }
    ```
 
-3. **User Data (`users/{uid}`) — Optional (if Auth is enabled)**
-   - Stores `preferences` (`readingMode`, `theme`, `fontSize`), `bookmarks` (array of `bookId`), and `progress` (map of `bookId -> { chapterIndex, completed }`).
+3. **User Data (`users/{uid}`) — Optional Google OAuth Cloud Sync**
+   - Single document per signed-in user storing `preferences` (`readingMode`, `theme`, `fontSize`, `fontFamily`), `bookmarks` (array of `bookId`), `progress` (map of `bookId -> { bookId, chapterIndex, pageIndex, scrollRatio, completed, lastReadAt }`), and `updatedAt` (Firestore timestamp).
 
 ### 5.2 Firestore Security Rules
 - `catalog/*` and `summaries/*`: `allow read: if true; allow write: if false;` (writes performed via Admin SDK script or verified admin UID).
@@ -185,11 +189,9 @@ To stay well within Firestore's **50,000 free reads/day**, documents are grouped
 2. **Phase 2 — Discovery & Details:** Build Home/Library screen, client-side search, category filters, and Book Detail screen.
 3. **Phase 3 — Dual-Mode Reader:** Implement outer horizontal chapter pager, Scroll Mode, dynamic-pagination Swipe Mode, HUD controls, and Theme/Typography settings.
 4. **Phase 4 — Offline Translation, Caching & Deployment:** Bundle/host Bergamot WASM + `enid`/`iden` models on Cloudflare Pages, implement contextual `en ↔ id` translation with download progress & local caching, enable Firestore offline persistence, PWA install polish, and deploy to Cloudflare Pages.
-5. **Phase 5 — Optional Enhancements:** Firebase Auth for cross-device sync and a simple admin upload utility for adding new book summaries.
+5. **Phase 5 — Cloud Sync & Optional Enhancements:** Enable Firebase Authentication (Google OAuth) for cross-device library sync (`users/{uid}`), plus optional future admin upload utility for adding new book summaries.
 
 ---
 
 ## 8. Open Decisions
-Before starting implementation, confirm:
-1. **User Accounts in MVP:** Start with **no login required** (local-only progress/bookmarks for fastest launch), or include **Firebase Auth (Google Sign-In)** from day 1?
-2. **Content Workflow:** Are you comfortable adding/updating book summaries via a local Markdown/JSON upload script (using Firebase Admin SDK), or do you want a password-protected `/admin` page in the app?
+1. **Content Workflow:** Continue adding/updating book summaries via the local seed/upload script (`npm run seed`), or add a password-protected `/admin` page in the app later?

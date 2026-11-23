@@ -1,4 +1,5 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app';
+import { getAuth, GoogleAuthProvider, type Auth } from 'firebase/auth';
 import {
   initializeFirestore,
   persistentLocalCache,
@@ -21,6 +22,8 @@ export const isFirebaseConfigured = Boolean(
 
 let app: FirebaseApp | null = null;
 let db: Firestore | null = null;
+let auth: Auth | null = null;
+let googleProvider: GoogleAuthProvider | null = null;
 
 if (isFirebaseConfigured) {
   try {
@@ -30,10 +33,15 @@ if (isFirebaseConfigured) {
         tabManager: persistentMultipleTabManager(),
       }),
     });
+    auth = getAuth(app);
+    googleProvider = new GoogleAuthProvider();
+    googleProvider.setCustomParameters({ prompt: 'select_account' });
   } catch (err) {
     console.warn('[Glance] Firebase init failed, falling back to local sample catalog:', err);
     db = null;
+    auth = null;
+    googleProvider = null;
   }
 }
 
-export { app, db };
+export { app, db, auth, googleProvider };

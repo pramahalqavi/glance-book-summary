@@ -25,7 +25,7 @@ rules_version = '2';
 //   - keyTakeaways: list<string> - key summary takeaways
 //   - chapters: list<map> - ordered chapters ({ index, title, contentMarkdown })
 //
-// Collection: users (Phase 2 — Optional Cloud Sync)
+// Collection: users (Phase 2 — Google OAuth Cloud Sync)
 // Document ID: uid (must match Firebase Auth request.auth.uid)
 // Access: Authenticated owner-only read, create, update, and delete.
 // Fields (all optional individually to support merge writes, strictly schema-bound):
@@ -33,8 +33,10 @@ rules_version = '2';
 //       - readingMode: string (optional, enum: 'scroll' | 'swipe')
 //       - theme: string (optional, enum: 'light' | 'sepia' | 'dark')
 //       - fontSize: string (optional, enum: 'sm' | 'md' | 'lg' | 'xl')
+//       - fontFamily: string (optional, enum: 'newsreader' | 'literata' | 'lora' | 'merriweather' | 'inter' | 'jakarta')
 //   - bookmarks: list<string> (optional, max 500 entries, bookId strings 1..128 chars)
 //   - progress: map (optional, max 500 entries, keyed by bookId)
+//       - entry fields: bookId, chapterIndex, pageIndex, scrollRatio, completed, lastReadAt
 //   - updatedAt: timestamp (optional, server/client sync timestamp)
 //
 // All other collections and subcollections are denied by default.
@@ -73,10 +75,11 @@ service cloud.firestore {
 
     function isValidPreferences(prefs) {
       return prefs is map &&
-        prefs.keys().hasOnly(['readingMode', 'theme', 'fontSize']) &&
+        prefs.keys().hasOnly(['readingMode', 'theme', 'fontSize', 'fontFamily']) &&
         (!('readingMode' in prefs) || (prefs.readingMode is string && prefs.readingMode in ['scroll', 'swipe'])) &&
         (!('theme' in prefs) || (prefs.theme is string && prefs.theme in ['light', 'sepia', 'dark'])) &&
-        (!('fontSize' in prefs) || (prefs.fontSize is string && prefs.fontSize in ['sm', 'md', 'lg', 'xl']));
+        (!('fontSize' in prefs) || (prefs.fontSize is string && prefs.fontSize in ['sm', 'md', 'lg', 'xl'])) &&
+        (!('fontFamily' in prefs) || (prefs.fontFamily is string && prefs.fontFamily in ['newsreader', 'literata', 'lora', 'merriweather', 'inter', 'jakarta']));
     }
 
     function isValidBookmarks(bookmarks) {
