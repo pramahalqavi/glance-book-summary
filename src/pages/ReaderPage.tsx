@@ -532,7 +532,9 @@ export function ReaderPage() {
               backgroundColor: 'var(--reader-surface)',
               borderColor: 'var(--reader-border)',
             }}
-            className="hidden lg:flex flex-col w-72 border-r pt-16 pb-16 shrink-0 overflow-y-auto"
+            className={`hidden lg:flex flex-col w-72 border-r shrink-0 overflow-y-auto transition-[padding] duration-250 ${
+              hudVisible ? 'pt-16 pb-16' : 'pt-4 pb-6'
+            }`}
           >
             <div className="px-4 py-3">
               <p className="text-[11px] font-semibold uppercase tracking-wider opacity-60">
@@ -629,6 +631,7 @@ export function ReaderPage() {
                 chapterCount={chapterCount}
                 fontSize={preferences.fontSize}
                 fontFamily={preferences.fontFamily}
+                hudVisible={hudVisible}
                 initialScrollRatio={
                   savedProgress?.chapterIndex === chapterIndex ? savedProgress.scrollRatio : 0
                 }
@@ -646,6 +649,7 @@ export function ReaderPage() {
                 chapterCount={chapterCount}
                 fontSize={preferences.fontSize}
                 fontFamily={preferences.fontFamily}
+                hudVisible={hudVisible}
                 pageIndex={pageIndex}
                 isCompleted={isCompleted}
                 onPageCountChange={handlePageCountChange}

@@ -9,6 +9,7 @@
         "supportEmail": "pramahalqavi97@gmail.com",
         "authorizedRedirectUris": [
           "https://glance-book-summary.firebaseapp.com/__/auth/handler",
+          "https://glance-read.pages.dev",
           "http://localhost:5173"
         ]
       }

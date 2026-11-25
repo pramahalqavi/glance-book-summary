@@ -1,6 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { MarkdownContent } from './MarkdownContent';
+import {
+  applyTouchDragSelection,
+  getCaretFromPoint,
+  hasNonEmptySelection,
+  selectWordAtCaret,
+  type CaretPoint,
+} from '../../lib/touchSelection';
 import type { Chapter, FontSize, ReaderFont } from '../../types/book';
 
 interface ScrollChapterViewProps {
@@ -8,6 +15,7 @@ interface ScrollChapterViewProps {
   chapterCount: number;
   fontSize: FontSize;
   fontFamily: ReaderFont;
+  hudVisible: boolean;
   initialScrollRatio?: number;
   isCompleted: boolean;
   onScrollRatioChange: (ratio: number) => void;
@@ -19,6 +27,8 @@ interface ScrollChapterViewProps {
 }
 
 const EDGE_GUARD_PX = 24;
+const DEADZONE_PX = 14;
+const LONG_PRESS_MS = 260;
 const HORIZONTAL_LOCK_RATIO = 1.35;
 const SWIPE_COMMIT_PX = 64;
 const SWIPE_VELOCITY_THRESHOLD = 0.35;
@@ -28,6 +38,7 @@ export function ScrollChapterView({
   chapterCount,
   fontSize,
   fontFamily,
+  hudVisible,
   initialScrollRatio = 0,
   isCompleted,
   onScrollRatioChange,
@@ -38,6 +49,7 @@ export function ScrollChapterView({
   onBackToLibrary,
 }: ScrollChapterViewProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const articleRef = useRef<HTMLElement | null>(null);
   const [dragX, setDragX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -45,22 +57,37 @@ export function ScrollChapterView({
     active: boolean;
     startX: number;
     startY: number;
+    lastX: number;
     startTime: number;
-    axis: 'none' | 'horizontal' | 'vertical';
+    axis: 'none' | 'horizontal' | 'vertical' | 'select';
     moved: boolean;
+    anchorCaret: CaretPoint | null;
+    initialSelectionText: string;
   }>({
     active: false,
     startX: 0,
     startY: 0,
+    lastX: 0,
     startTime: 0,
     axis: 'none',
     moved: false,
+    anchorCaret: null,
+    initialSelectionText: '',
   });
 
+  const longPressTimerRef = useRef<number | null>(null);
+  const hadSelectionAtStartRef = useRef(false);
   const wheelLockRef = useRef<number>(0);
   const initialScrollRatioRef = useRef(initialScrollRatio);
   const lastReportedRatioRef = useRef(-1);
   const scrollRafRef = useRef<number | null>(null);
+
+  const clearLongPressTimer = useCallback(() => {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
 
   // Restore scroll position ONLY when switching chapters (never fight active user scrolling)
   useEffect(() => {
@@ -77,11 +104,12 @@ export function ScrollChapterView({
 
   useEffect(() => {
     return () => {
+      clearLongPressTimer();
       if (scrollRafRef.current !== null) {
         cancelAnimationFrame(scrollRafRef.current);
       }
     };
-  }, []);
+  }, [clearLongPressTimer]);
 
   const handleScroll = () => {
     if (scrollRafRef.current !== null) return;
@@ -91,7 +119,6 @@ export function ScrollChapterView({
       if (!el) return;
       const maxScroll = el.scrollHeight - el.clientHeight;
       const ratio = maxScroll <= 0 ? 1 : Math.max(0, Math.min(1, el.scrollTop / maxScroll));
-      // Only notify parent when progress moves noticeably (>= 1%)
       if (Math.abs(ratio - lastReportedRatioRef.current) >= 0.01 || ratio === 0 || ratio === 1) {
         lastReportedRatioRef.current = ratio;
         onScrollRatioChange(ratio);
@@ -99,98 +126,209 @@ export function ScrollChapterView({
     });
   };
 
-  // Touch handlers with gesture disambiguation (PRD §6)
-  const onTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length !== 1) return;
-    const touch = e.touches[0];
-    // Respect iOS Safari left-edge back swipe gesture
-    if (touch.clientX < EDGE_GUARD_PX) return;
-
-    gestureRef.current = {
-      active: true,
-      startX: touch.clientX,
-      startY: touch.clientY,
-      startTime: performance.now(),
-      axis: 'none',
-      moved: false,
-    };
+  const stateRef = useRef({
+    chapterIndex: chapter.index,
+    chapterCount,
+    onNextChapter,
+    onPrevChapter,
+  });
+  stateRef.current = {
+    chapterIndex: chapter.index,
+    chapterCount,
+    onNextChapter,
+    onPrevChapter,
   };
 
-  const onTouchMove = (e: React.TouchEvent) => {
-    const g = gestureRef.current;
-    if (!g.active || e.touches.length !== 1) return;
-    const touch = e.touches[0];
-    const dx = touch.clientX - g.startX;
-    const dy = touch.clientY - g.startY;
-    const absX = Math.abs(dx);
-    const absY = Math.abs(dy);
+  const finishHorizontalGesture = useCallback((finalDx: number, startTime: number) => {
+    const {
+      chapterIndex: chIdx,
+      chapterCount: chTotal,
+      onNextChapter: nextFn,
+      onPrevChapter: prevFn,
+    } = stateRef.current;
 
-    if (absX > 6 || absY > 6) {
-      g.moved = true;
-    }
-
-    if (g.axis === 'none') {
-      if (absX < 10 && absY < 10) return;
-      if (absX > absY * HORIZONTAL_LOCK_RATIO) {
-        g.axis = 'horizontal';
-        setIsDragging(true);
-      } else {
-        g.axis = 'vertical';
-        return;
-      }
-    }
-
-    if (g.axis === 'horizontal') {
-      // Dampen edge overscroll on first/last chapter
-      const atStart = chapter.index === 0 && dx > 0;
-      const atEnd = chapter.index === chapterCount - 1 && dx < 0;
-      const dampened = atStart || atEnd ? dx * 0.25 : dx;
-      setDragX(dampened);
-    }
-  };
-
-  const finishHorizontalGesture = (finalDx: number) => {
-    const g = gestureRef.current;
-    const elapsed = Math.max(1, performance.now() - g.startTime);
+    const elapsed = Math.max(1, performance.now() - startTime);
     const velocity = Math.abs(finalDx) / elapsed;
-    const shouldCommit = Math.abs(finalDx) >= SWIPE_COMMIT_PX || velocity >= SWIPE_VELOCITY_THRESHOLD;
+    const shouldCommit =
+      Math.abs(finalDx) >= SWIPE_COMMIT_PX || velocity >= SWIPE_VELOCITY_THRESHOLD;
 
     setIsDragging(false);
     setDragX(0);
 
     if (shouldCommit) {
-      if (finalDx < 0 && chapter.index < chapterCount - 1) {
-        onNextChapter();
-      } else if (finalDx > 0 && chapter.index > 0) {
-        onPrevChapter();
+      if (finalDx < 0 && chIdx < chTotal - 1) {
+        nextFn();
+      } else if (finalDx > 0 && chIdx > 0) {
+        prevFn();
       }
     }
-  };
+  }, []);
 
-  const onTouchEnd = (e: React.TouchEvent) => {
-    const g = gestureRef.current;
-    if (!g.active) return;
-    g.active = false;
+  // Native touch listeners (`passive: false` on touchmove so multi-word drag selection & horizontal swipe don't fight scroll)
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
 
-    if (g.axis === 'horizontal') {
-      const touch = e.changedTouches[0];
-      const dx = touch ? touch.clientX - g.startX : dragX;
-      finishHorizontalGesture(dx);
-    }
-  };
+    const handleTouchStart = (e: TouchEvent) => {
+      clearLongPressTimer();
+      const existingSelText = window.getSelection()?.toString() ?? '';
+      hadSelectionAtStartRef.current = existingSelText.trim().length > 0;
 
-  // Mouse drag support for desktop horizontal chapter swipe
+      if (e.touches.length !== 1) return;
+      const touch = e.touches[0];
+      if (touch.clientX < EDGE_GUARD_PX) return;
+      if ((e.target as HTMLElement | null)?.closest('button, a')) return;
+
+      const startX = touch.clientX;
+      const startY = touch.clientY;
+      const anchorCaret = getCaretFromPoint(startX, startY, articleRef.current, true);
+
+      gestureRef.current = {
+        active: true,
+        startX,
+        startY,
+        lastX: startX,
+        startTime: performance.now(),
+        axis: 'none',
+        moved: false,
+        anchorCaret,
+        initialSelectionText: existingSelText,
+      };
+
+      if (anchorCaret) {
+        longPressTimerRef.current = window.setTimeout(() => {
+          longPressTimerRef.current = null;
+          const g = gestureRef.current;
+          if (g.active && g.axis === 'none') {
+            g.axis = 'select';
+            if (!hasNonEmptySelection()) {
+              selectWordAtCaret(anchorCaret);
+            }
+          }
+        }, LONG_PRESS_MS);
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      const g = gestureRef.current;
+      if (!g.active || e.touches.length !== 1) return;
+
+      const touch = e.touches[0];
+      const dx = touch.clientX - g.startX;
+      const dy = touch.clientY - g.startY;
+      const absX = Math.abs(dx);
+      const absY = Math.abs(dy);
+      g.lastX = touch.clientX;
+
+      if (absX > 6 || absY > 6) {
+        g.moved = true;
+      }
+
+      if (g.axis === 'none') {
+        const currentSelText = window.getSelection()?.toString() ?? '';
+        if (
+          hadSelectionAtStartRef.current &&
+          currentSelText.length > 0 &&
+          currentSelText !== g.initialSelectionText
+        ) {
+          clearLongPressTimer();
+          g.active = false;
+          return;
+        }
+
+        const heldMs = performance.now() - g.startTime;
+        const newNativeSelectionStarted =
+          !hadSelectionAtStartRef.current && currentSelText.trim().length > 0;
+
+        if (newNativeSelectionStarted || (heldMs >= LONG_PRESS_MS && g.anchorCaret)) {
+          clearLongPressTimer();
+          g.axis = 'select';
+        } else {
+          if (absX < DEADZONE_PX && absY < DEADZONE_PX) return;
+          clearLongPressTimer();
+          if (absX > absY * HORIZONTAL_LOCK_RATIO) {
+            g.axis = 'horizontal';
+            window.getSelection()?.removeAllRanges();
+            setIsDragging(true);
+          } else {
+            g.axis = 'vertical';
+            return;
+          }
+        }
+      }
+
+      if (g.axis === 'select') {
+        if (!g.anchorCaret) return;
+        if (e.cancelable) e.preventDefault();
+        if (Math.hypot(dx, dy) >= 6) {
+          applyTouchDragSelection(
+            g.anchorCaret,
+            touch.clientX,
+            touch.clientY,
+            articleRef.current
+          );
+        }
+        return;
+      }
+
+      if (g.axis === 'horizontal') {
+        if (e.cancelable) e.preventDefault();
+        const { chapterIndex: chIdx, chapterCount: chTotal } = stateRef.current;
+        const atStart = chIdx === 0 && dx > 0;
+        const atEnd = chIdx === chTotal - 1 && dx < 0;
+        setDragX(atStart || atEnd ? dx * 0.25 : dx);
+      }
+    };
+
+    const handleTouchEnd = () => {
+      clearLongPressTimer();
+      const g = gestureRef.current;
+      if (!g.active) return;
+      g.active = false;
+
+      if (g.axis === 'horizontal') {
+        finishHorizontalGesture(g.lastX - g.startX, g.startTime);
+      }
+    };
+
+    const handleContextMenu = (e: MouseEvent) => {
+      const g = gestureRef.current;
+      if (g.active && (g.moved || window.matchMedia('(any-hover: hover)').matches)) {
+        e.preventDefault();
+      }
+    };
+
+    el.addEventListener('touchstart', handleTouchStart, { passive: true });
+    el.addEventListener('touchmove', handleTouchMove, { passive: false });
+    el.addEventListener('touchend', handleTouchEnd, { passive: true });
+    el.addEventListener('touchcancel', handleTouchEnd, { passive: true });
+    el.addEventListener('contextmenu', handleContextMenu);
+
+    return () => {
+      el.removeEventListener('touchstart', handleTouchStart);
+      el.removeEventListener('touchmove', handleTouchMove);
+      el.removeEventListener('touchend', handleTouchEnd);
+      el.removeEventListener('touchcancel', handleTouchEnd);
+      el.removeEventListener('contextmenu', handleContextMenu);
+    };
+  }, [clearLongPressTimer, finishHorizontalGesture]);
+
+  // Mouse drag support for desktop horizontal chapter swipe (outside selectable prose)
   const onMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
-    // Do not hijack button/link clicks
-    if ((e.target as HTMLElement).closest('button, a')) return;
+    hadSelectionAtStartRef.current = hasNonEmptySelection();
+    const target = e.target as HTMLElement;
+    if (target.closest('button, a, .reader-prose, header')) return;
     gestureRef.current = {
       active: true,
       startX: e.clientX,
       startY: e.clientY,
+      lastX: e.clientX,
       startTime: performance.now(),
       axis: 'none',
       moved: false,
+      anchorCaret: null,
+      initialSelectionText: '',
     };
   };
 
@@ -201,6 +339,7 @@ export function ScrollChapterView({
     const dy = e.clientY - g.startY;
     const absX = Math.abs(dx);
     const absY = Math.abs(dy);
+    g.lastX = e.clientX;
 
     if (absX > 8 || absY > 8) g.moved = true;
 
@@ -226,7 +365,7 @@ export function ScrollChapterView({
     if (!g.active) return;
     g.active = false;
     if (g.axis === 'horizontal') {
-      finishHorizontalGesture(e.clientX - g.startX);
+      finishHorizontalGesture(e.clientX - g.startX, g.startTime);
     }
   };
 
@@ -248,10 +387,16 @@ export function ScrollChapterView({
   };
 
   const handleContainerClick = (e: React.MouseEvent) => {
-    if (gestureRef.current.moved) return;
+    if (gestureRef.current.moved || gestureRef.current.axis === 'select') {
+      gestureRef.current.moved = false;
+      gestureRef.current.axis = 'none';
+      return;
+    }
     if ((e.target as HTMLElement).closest('button, a')) return;
-    const selection = window.getSelection()?.toString();
-    if (selection) return;
+    if (hadSelectionAtStartRef.current || hasNonEmptySelection()) {
+      hadSelectionAtStartRef.current = false;
+      return;
+    }
     onToggleHud();
   };
 
@@ -262,9 +407,6 @@ export function ScrollChapterView({
     <div
       ref={scrollRef}
       onScroll={handleScroll}
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
       onMouseDown={onMouseDown}
       onMouseMove={onMouseMove}
       onMouseUp={onMouseUp}
@@ -280,11 +422,20 @@ export function ScrollChapterView({
       className="h-full w-full overflow-y-auto overscroll-x-none touch-pan-y"
     >
       <article
+        ref={articleRef}
         style={{
+          paddingTop: hudVisible
+            ? 'calc(4.5rem + env(safe-area-inset-top, 0px))'
+            : 'calc(1.25rem + env(safe-area-inset-top, 0px))',
+          paddingBottom: hudVisible
+            ? 'calc(4.5rem + env(safe-area-inset-bottom, 0px))'
+            : 'calc(1.25rem + env(safe-area-inset-bottom, 0px))',
           transform: dragX !== 0 ? `translate3d(${dragX}px, 0, 0)` : undefined,
-          transition: isDragging ? 'none' : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+          transition: isDragging
+            ? 'padding 250ms ease-out'
+            : 'padding 250ms ease-out, transform 220ms cubic-bezier(0.22, 1, 0.36, 1)',
         }}
-        className="max-w-[680px] mx-auto px-6 sm:px-10 pt-18 pb-16 select-text"
+        className="max-w-[680px] mx-auto px-6 sm:px-10 select-text"
       >
         <header className="mb-7">
           <p
@@ -310,7 +461,7 @@ export function ScrollChapterView({
         {/* End-of-chapter / End-of-book footer */}
         <footer
           style={{ borderColor: 'var(--reader-border)' }}
-          className="mt-8 pt-6 border-t"
+          className="mt-8 pt-6 border-t select-none"
         >
           {isLast ? (
             <div

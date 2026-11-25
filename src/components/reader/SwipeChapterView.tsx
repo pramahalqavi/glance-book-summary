@@ -1,6 +1,13 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import { MarkdownContent } from './MarkdownContent';
+import {
+  applyTouchDragSelection,
+  getCaretFromPoint,
+  hasNonEmptySelection,
+  selectWordAtCaret,
+  type CaretPoint,
+} from '../../lib/touchSelection';
 import type { Chapter, FontSize, ReaderFont } from '../../types/book';
 
 interface SwipeChapterViewProps {
@@ -8,6 +15,7 @@ interface SwipeChapterViewProps {
   chapterCount: number;
   fontSize: FontSize;
   fontFamily: ReaderFont;
+  hudVisible: boolean;
   pageIndex: number;
   isCompleted: boolean;
   onPageCountChange: (count: number) => void;
@@ -21,6 +29,10 @@ interface SwipeChapterViewProps {
 
 const EDGE_GUARD_PX = 20;
 const COLUMN_GAP = 40;
+const DEADZONE_PX = 14;
+const MOUSE_DEADZONE_PX = 12;
+const LONG_PRESS_MS = 260;
+const HORIZONTAL_LOCK_RATIO = 1.2;
 const SWIPE_COMMIT_PX = 52;
 const SWIPE_VELOCITY_THRESHOLD = 0.3;
 
@@ -29,6 +41,7 @@ export function SwipeChapterView({
   chapterCount,
   fontSize,
   fontFamily,
+  hudVisible,
   pageIndex,
   isCompleted,
   onPageCountChange,
@@ -39,30 +52,100 @@ export function SwipeChapterView({
   onMarkComplete,
   onBackToLibrary,
 }: SwipeChapterViewProps) {
+  const outerRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
 
   const [viewportWidth, setViewportWidth] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(0);
   const [pageCount, setPageCount] = useState(1);
-  const [dragX, setDragX] = useState(0);
+  // Rubber-band offset ONLY at start/end of book; keeping `transform: none` when idle
+  // avoids WebKit/Blink multi-column + CSS transform text-selection bugs on mobile.
+  const [overscrollX, setOverscrollX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [isSelectingText, setIsSelectingText] = useState(false);
 
   const gestureRef = useRef<{
     active: boolean;
+    pointer: 'none' | 'touch' | 'mouse';
     startX: number;
     startY: number;
+    lastX: number;
     startTime: number;
+    axis: 'none' | 'horizontal' | 'vertical' | 'select';
     moved: boolean;
+    anchorCaret: CaretPoint | null;
+    initialSelectionText: string;
   }>({
     active: false,
+    pointer: 'none',
     startX: 0,
     startY: 0,
+    lastX: 0,
     startTime: 0,
+    axis: 'none',
     moved: false,
+    anchorCaret: null,
+    initialSelectionText: '',
   });
 
+  const longPressTimerRef = useRef<number | null>(null);
+  const scrollAnimRafRef = useRef<number | null>(null);
+  const prevChapterIndexRef = useRef<number>(chapter.index);
+  const hadSelectionAtStartRef = useRef(false);
   const wheelLockRef = useRef<number>(0);
+
+  const clearLongPressTimer = useCallback(() => {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
+  const cancelScrollAnim = useCallback(() => {
+    if (scrollAnimRafRef.current !== null) {
+      cancelAnimationFrame(scrollAnimRafRef.current);
+      scrollAnimRafRef.current = null;
+    }
+  }, []);
+
+  const animateViewportScrollTo = useCallback(
+    (targetLeft: number, immediate = false) => {
+      const vp = viewportRef.current;
+      if (!vp) return;
+      cancelScrollAnim();
+
+      if (immediate || Math.abs(vp.scrollLeft - targetLeft) < 1) {
+        vp.scrollLeft = targetLeft;
+        return;
+      }
+
+      const startLeft = vp.scrollLeft;
+      const delta = targetLeft - startLeft;
+      const duration = 250;
+      const startTs = performance.now();
+
+      const tick = (now: number) => {
+        const currentVp = viewportRef.current;
+        if (!currentVp) return;
+        const t = Math.min(1, (now - startTs) / duration);
+        const eased = 1 - Math.pow(1 - t, 3);
+        currentVp.scrollLeft = startLeft + delta * eased;
+        if (t < 1) {
+          scrollAnimRafRef.current = requestAnimationFrame(tick);
+        } else {
+          currentVp.scrollLeft = targetLeft;
+          scrollAnimRafRef.current = null;
+        }
+      };
+
+      scrollAnimRafRef.current = requestAnimationFrame(tick);
+    },
+    [cancelScrollAnim]
+  );
+
+  const clampedPage = Math.max(0, Math.min(pageIndex, pageCount - 1));
+  const stride = viewportWidth + COLUMN_GAP;
 
   // Measure viewport & dynamically compute CSS multi-column page count
   const measurePages = useCallback(() => {
@@ -77,13 +160,14 @@ export function SwipeChapterView({
     setViewportWidth(w);
     setViewportHeight(h);
 
-    // Wait a frame after width/height apply so scrollWidth reflects exact multi-column pagination
     requestAnimationFrame(() => {
-      if (!contentRef.current || !viewportRef.current) return;
-      const cw = viewportRef.current.clientWidth;
-      const sw = contentRef.current.scrollWidth;
-      const stride = cw + COLUMN_GAP;
-      const computed = Math.max(1, Math.round((sw + COLUMN_GAP) / stride));
+      const vpNow = viewportRef.current;
+      const contentNow = contentRef.current;
+      if (!contentNow || !vpNow) return;
+      const cw = vpNow.clientWidth;
+      const sw = contentNow.scrollWidth;
+      const nextStride = cw + COLUMN_GAP;
+      const computed = Math.max(1, Math.round((sw + COLUMN_GAP) / nextStride));
       setPageCount(computed);
       onPageCountChange(computed);
     });
@@ -91,7 +175,15 @@ export function SwipeChapterView({
 
   useLayoutEffect(() => {
     measurePages();
-  }, [measurePages, chapter.index, chapter.title, chapter.contentMarkdown, fontSize, fontFamily]);
+  }, [
+    measurePages,
+    hudVisible,
+    chapter.index,
+    chapter.title,
+    chapter.contentMarkdown,
+    fontSize,
+    fontFamily,
+  ]);
 
   useEffect(() => {
     const vp = viewportRef.current;
@@ -101,9 +193,20 @@ export function SwipeChapterView({
     return () => observer.disconnect();
   }, [measurePages]);
 
-  const clampedPage = Math.max(0, Math.min(pageIndex, pageCount - 1));
-  const stride = viewportWidth + COLUMN_GAP;
-  const baseTranslate = -(clampedPage * stride);
+  // Align `viewportRef.scrollLeft` to `clampedPage * stride` (zero CSS transform when idle)
+  useLayoutEffect(() => {
+    if (viewportWidth <= 0 || isDragging) return;
+    const chapterChanged = prevChapterIndexRef.current !== chapter.index;
+    prevChapterIndexRef.current = chapter.index;
+    animateViewportScrollTo(clampedPage * stride, chapterChanged);
+  }, [clampedPage, stride, viewportWidth, isDragging, chapter.index, animateViewportScrollTo]);
+
+  useEffect(() => {
+    return () => {
+      clearLongPressTimer();
+      cancelScrollAnim();
+    };
+  }, [clearLongPressTimer, cancelScrollAnim]);
 
   const goNext = useCallback(() => {
     if (clampedPage < pageCount - 1) {
@@ -121,90 +224,378 @@ export function SwipeChapterView({
     }
   }, [clampedPage, onPageChange, chapter.index, onPrevChapter]);
 
-  const finishSwipe = (dx: number) => {
-    const elapsed = Math.max(1, performance.now() - gestureRef.current.startTime);
+  const stateRef = useRef({
+    clampedPage,
+    pageCount,
+    stride,
+    chapterIndex: chapter.index,
+    chapterCount,
+    goNext,
+    goPrev,
+    animateViewportScrollTo,
+  });
+  stateRef.current = {
+    clampedPage,
+    pageCount,
+    stride,
+    chapterIndex: chapter.index,
+    chapterCount,
+    goNext,
+    goPrev,
+    animateViewportScrollTo,
+  };
+
+  const applyHorizontalDrag = useCallback((dx: number) => {
+    const {
+      clampedPage: curPage,
+      pageCount: totalPages,
+      stride: curStride,
+      chapterIndex: chIdx,
+      chapterCount: chTotal,
+    } = stateRef.current;
+
+    const atBookStart = chIdx === 0 && curPage === 0 && dx > 0;
+    const atBookEnd = chIdx === chTotal - 1 && curPage === totalPages - 1 && dx < 0;
+    const vp = viewportRef.current;
+
+    if (atBookStart || atBookEnd) {
+      if (vp) vp.scrollLeft = curPage * curStride;
+      setOverscrollX(dx * 0.25);
+    } else {
+      setOverscrollX(0);
+      if (vp) {
+        const baseLeft = curPage * curStride;
+        const maxLeft = Math.max(0, (totalPages - 1) * curStride);
+        const targetLeft = baseLeft - dx;
+        if (targetLeft < 0) {
+          vp.scrollLeft = 0;
+          setOverscrollX(-targetLeft * 0.35);
+        } else if (targetLeft > maxLeft) {
+          vp.scrollLeft = maxLeft;
+          setOverscrollX((maxLeft - targetLeft) * 0.35);
+        } else {
+          vp.scrollLeft = targetLeft;
+        }
+      }
+    }
+  }, []);
+
+  const finishSwipe = useCallback((dx: number, startTime: number) => {
+    const {
+      clampedPage: curPage,
+      pageCount: totalPages,
+      stride: curStride,
+      chapterIndex: chIdx,
+      chapterCount: chTotal,
+      goNext: nextFn,
+      goPrev: prevFn,
+      animateViewportScrollTo: animScroll,
+    } = stateRef.current;
+
+    const elapsed = Math.max(1, performance.now() - startTime);
     const velocity = Math.abs(dx) / elapsed;
     const commit = Math.abs(dx) >= SWIPE_COMMIT_PX || velocity >= SWIPE_VELOCITY_THRESHOLD;
 
     setIsDragging(false);
-    setDragX(0);
+    setOverscrollX(0);
 
     if (commit) {
-      if (dx < 0) goNext();
-      else if (dx > 0) goPrev();
+      if (dx < 0 && (curPage < totalPages - 1 || chIdx < chTotal - 1)) {
+        nextFn();
+        return;
+      }
+      if (dx > 0 && (curPage > 0 || chIdx > 0)) {
+        prevFn();
+        return;
+      }
     }
-  };
 
-  // Touch handlers
-  const onTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length !== 1) return;
-    const touch = e.touches[0];
-    if (touch.clientX < EDGE_GUARD_PX) return;
-    gestureRef.current = {
-      active: true,
-      startX: touch.clientX,
-      startY: touch.clientY,
-      startTime: performance.now(),
-      moved: false,
+    animScroll(curPage * curStride, false);
+  }, []);
+
+  // Native touch listeners (`passive: false` on touchmove so multi-word drag selection works smoothly)
+  useEffect(() => {
+    const el = outerRef.current;
+    if (!el) return;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      clearLongPressTimer();
+      const existingSelText = window.getSelection()?.toString() ?? '';
+      hadSelectionAtStartRef.current = existingSelText.trim().length > 0;
+
+      if (e.touches.length !== 1) return;
+      const touch = e.touches[0];
+      if (touch.clientX < EDGE_GUARD_PX) return;
+      if ((e.target as HTMLElement | null)?.closest('button, a')) return;
+
+      const startX = touch.clientX;
+      const startY = touch.clientY;
+      const anchorCaret = getCaretFromPoint(startX, startY, contentRef.current, true);
+
+      gestureRef.current = {
+        active: true,
+        pointer: 'touch',
+        startX,
+        startY,
+        lastX: startX,
+        startTime: performance.now(),
+        axis: 'none',
+        moved: false,
+        anchorCaret,
+        initialSelectionText: existingSelText,
+      };
+
+      if (anchorCaret) {
+        longPressTimerRef.current = window.setTimeout(() => {
+          longPressTimerRef.current = null;
+          const g = gestureRef.current;
+          if (g.active && g.pointer === 'touch' && g.axis === 'none') {
+            g.axis = 'select';
+            setIsSelectingText(true);
+            if (!hasNonEmptySelection()) {
+              selectWordAtCaret(anchorCaret);
+            }
+          }
+        }, LONG_PRESS_MS);
+      }
     };
-    setIsDragging(true);
-  };
 
-  const onTouchMove = (e: React.TouchEvent) => {
-    const g = gestureRef.current;
-    if (!g.active || e.touches.length !== 1) return;
-    const dx = e.touches[0].clientX - g.startX;
-    if (Math.abs(dx) > 6) g.moved = true;
+    const handleTouchMove = (e: TouchEvent) => {
+      const g = gestureRef.current;
+      if (!g.active || g.pointer !== 'touch' || e.touches.length !== 1) return;
 
-    const atBookStart = chapter.index === 0 && clampedPage === 0 && dx > 0;
-    const atBookEnd = chapter.index === chapterCount - 1 && clampedPage === pageCount - 1 && dx < 0;
-    setDragX(atBookStart || atBookEnd ? dx * 0.25 : dx);
-  };
+      const touch = e.touches[0];
+      const dx = touch.clientX - g.startX;
+      const dy = touch.clientY - g.startY;
+      const absX = Math.abs(dx);
+      const absY = Math.abs(dy);
+      g.lastX = touch.clientX;
 
-  const onTouchEnd = (e: React.TouchEvent) => {
-    const g = gestureRef.current;
-    if (!g.active) return;
-    g.active = false;
-    const touch = e.changedTouches[0];
-    finishSwipe(touch ? touch.clientX - g.startX : dragX);
-  };
+      if (absX > 6 || absY > 6) {
+        g.moved = true;
+      }
 
-  // Mouse drag handlers
+      if (g.axis === 'none') {
+        const currentSelText = window.getSelection()?.toString() ?? '';
+        if (
+          hadSelectionAtStartRef.current &&
+          currentSelText.length > 0 &&
+          currentSelText !== g.initialSelectionText
+        ) {
+          clearLongPressTimer();
+          g.active = false;
+          return;
+        }
+
+        const heldMs = performance.now() - g.startTime;
+        const newNativeSelectionStarted =
+          !hadSelectionAtStartRef.current && currentSelText.trim().length > 0;
+
+        if (newNativeSelectionStarted || (heldMs >= LONG_PRESS_MS && g.anchorCaret)) {
+          clearLongPressTimer();
+          g.axis = 'select';
+          setIsSelectingText(true);
+        } else {
+          if (absX < DEADZONE_PX && absY < DEADZONE_PX) return;
+          clearLongPressTimer();
+          if (absX > absY * HORIZONTAL_LOCK_RATIO) {
+            g.axis = 'horizontal';
+            cancelScrollAnim();
+            window.getSelection()?.removeAllRanges();
+            setIsDragging(true);
+          } else {
+            g.axis = 'vertical';
+            return;
+          }
+        }
+      }
+
+      if (g.axis === 'select') {
+        if (!g.anchorCaret) return;
+        if (e.cancelable) e.preventDefault();
+        if (Math.hypot(dx, dy) >= 6) {
+          applyTouchDragSelection(
+            g.anchorCaret,
+            touch.clientX,
+            touch.clientY,
+            contentRef.current
+          );
+        }
+        return;
+      }
+
+      if (g.axis === 'horizontal') {
+        if (e.cancelable) e.preventDefault();
+        applyHorizontalDrag(dx);
+      }
+    };
+
+    const handleTouchEnd = () => {
+      clearLongPressTimer();
+      const g = gestureRef.current;
+      if (!g.active || g.pointer !== 'touch') return;
+      g.active = false;
+      setIsSelectingText(false);
+
+      if (g.axis === 'horizontal') {
+        finishSwipe(g.lastX - g.startX, g.startTime);
+      }
+    };
+
+    const handleContextMenu = (e: MouseEvent) => {
+      const g = gestureRef.current;
+      if (
+        g.active &&
+        g.pointer === 'touch' &&
+        (g.moved || window.matchMedia('(any-hover: hover)').matches)
+      ) {
+        e.preventDefault();
+      }
+    };
+
+    el.addEventListener('touchstart', handleTouchStart, { passive: true });
+    el.addEventListener('touchmove', handleTouchMove, { passive: false });
+    el.addEventListener('touchend', handleTouchEnd, { passive: true });
+    el.addEventListener('touchcancel', handleTouchEnd, { passive: true });
+    el.addEventListener('contextmenu', handleContextMenu);
+
+    return () => {
+      el.removeEventListener('touchstart', handleTouchStart);
+      el.removeEventListener('touchmove', handleTouchMove);
+      el.removeEventListener('touchend', handleTouchEnd);
+      el.removeEventListener('touchcancel', handleTouchEnd);
+      el.removeEventListener('contextmenu', handleContextMenu);
+    };
+  }, [clearLongPressTimer, cancelScrollAnim, applyHorizontalDrag, finishSwipe]);
+
+  // Desktop mouse gesture: matches mobile behavior!
+  // Quick click-and-drag (< 260ms) anywhere swipes the page;
+  // Long-press hold (>= 260ms) + drag on text selects words/lines smoothly.
   const onMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
     if ((e.target as HTMLElement).closest('button, a')) return;
+
+    clearLongPressTimer();
+    const existingSelText = window.getSelection()?.toString() ?? '';
+    hadSelectionAtStartRef.current = existingSelText.trim().length > 0;
+
+    // Prevent immediate native drag-selection so quick mouse drags swipe the page cleanly
+    e.preventDefault();
+
+    if (hadSelectionAtStartRef.current) {
+      window.getSelection()?.removeAllRanges();
+    }
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const anchorCaret = getCaretFromPoint(startX, startY, contentRef.current, true);
+
+    // Support quick double-click to select a single word
+    if (e.detail >= 2 && anchorCaret) {
+      selectWordAtCaret(anchorCaret);
+      hadSelectionAtStartRef.current = true;
+      gestureRef.current.active = false;
+      return;
+    }
+
     gestureRef.current = {
       active: true,
-      startX: e.clientX,
-      startY: e.clientY,
+      pointer: 'mouse',
+      startX,
+      startY,
+      lastX: startX,
       startTime: performance.now(),
+      axis: 'none',
       moved: false,
+      anchorCaret,
+      initialSelectionText: '',
     };
-    setIsDragging(true);
-  };
 
-  const onMouseMove = (e: React.MouseEvent) => {
-    const g = gestureRef.current;
-    if (!g.active) return;
-    const dx = e.clientX - g.startX;
-    if (Math.abs(dx) > 8) g.moved = true;
-
-    const atBookStart = chapter.index === 0 && clampedPage === 0 && dx > 0;
-    const atBookEnd = chapter.index === chapterCount - 1 && clampedPage === pageCount - 1 && dx < 0;
-    setDragX(atBookStart || atBookEnd ? dx * 0.25 : dx);
-  };
-
-  const onMouseUp = (e: React.MouseEvent) => {
-    const g = gestureRef.current;
-    if (!g.active) return;
-    g.active = false;
-    if (g.moved) {
-      finishSwipe(e.clientX - g.startX);
-    } else {
-      setIsDragging(false);
-      setDragX(0);
+    if (anchorCaret) {
+      longPressTimerRef.current = window.setTimeout(() => {
+        longPressTimerRef.current = null;
+        const g = gestureRef.current;
+        if (g.active && g.pointer === 'mouse' && g.axis === 'none') {
+          g.axis = 'select';
+          setIsSelectingText(true);
+          selectWordAtCaret(anchorCaret);
+        }
+      }, LONG_PRESS_MS);
     }
   };
+
+  // Window-level mousemove / mouseup so dragging outside the column bounds still tracks smoothly
+  useEffect(() => {
+    const handleWindowMouseMove = (e: MouseEvent) => {
+      const g = gestureRef.current;
+      if (!g.active || g.pointer !== 'mouse') return;
+
+      const dx = e.clientX - g.startX;
+      const dy = e.clientY - g.startY;
+      const absX = Math.abs(dx);
+      const absY = Math.abs(dy);
+      g.lastX = e.clientX;
+
+      if (absX > 6 || absY > 6) {
+        g.moved = true;
+      }
+
+      if (g.axis === 'none') {
+        const heldMs = performance.now() - g.startTime;
+        if (heldMs >= LONG_PRESS_MS && g.anchorCaret) {
+          clearLongPressTimer();
+          g.axis = 'select';
+          setIsSelectingText(true);
+          if (!hasNonEmptySelection()) {
+            selectWordAtCaret(g.anchorCaret);
+          }
+        } else {
+          if (absX < MOUSE_DEADZONE_PX && absY < MOUSE_DEADZONE_PX) return;
+          clearLongPressTimer();
+          if (absX > absY * HORIZONTAL_LOCK_RATIO) {
+            g.axis = 'horizontal';
+            cancelScrollAnim();
+            window.getSelection()?.removeAllRanges();
+            setIsDragging(true);
+          } else {
+            g.axis = 'vertical';
+            return;
+          }
+        }
+      }
+
+      if (g.axis === 'select') {
+        if (!g.anchorCaret) return;
+        if (Math.hypot(dx, dy) >= 6) {
+          applyTouchDragSelection(g.anchorCaret, e.clientX, e.clientY, contentRef.current);
+        }
+        return;
+      }
+
+      if (g.axis === 'horizontal') {
+        applyHorizontalDrag(dx);
+      }
+    };
+
+    const handleWindowMouseUp = (e: MouseEvent) => {
+      const g = gestureRef.current;
+      if (!g.active || g.pointer !== 'mouse') return;
+      clearLongPressTimer();
+      g.active = false;
+      setIsSelectingText(false);
+
+      if (g.axis === 'horizontal') {
+        finishSwipe(e.clientX - g.startX, g.startTime);
+      }
+    };
+
+    window.addEventListener('mousemove', handleWindowMouseMove);
+    window.addEventListener('mouseup', handleWindowMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleWindowMouseMove);
+      window.removeEventListener('mouseup', handleWindowMouseUp);
+    };
+  }, [clearLongPressTimer, cancelScrollAnim, applyHorizontalDrag, finishSwipe]);
 
   // Trackpad horizontal swipe
   const onWheel = (e: React.WheelEvent) => {
@@ -220,59 +611,65 @@ export function SwipeChapterView({
     else goPrev();
   };
 
-  // Tap zones: left 20% = prev, right 20% = next, center 60% = toggle HUD
+  // Tap/click toggles HUD (ignored when dragging, selecting, or dismissing a text selection)
   const onClick = (e: React.MouseEvent) => {
-    if (gestureRef.current.moved) return;
-    if ((e.target as HTMLElement).closest('button, a')) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const relX = (e.clientX - rect.left) / rect.width;
-    if (relX < 0.18) {
-      goPrev();
-    } else if (relX > 0.82) {
-      goNext();
-    } else {
-      onToggleHud();
+    if (gestureRef.current.moved || gestureRef.current.axis === 'select') {
+      gestureRef.current.moved = false;
+      gestureRef.current.axis = 'none';
+      return;
     }
+    if ((e.target as HTMLElement).closest('button, a')) return;
+    if (hadSelectionAtStartRef.current || hasNonEmptySelection()) {
+      hadSelectionAtStartRef.current = false;
+      return;
+    }
+
+    onToggleHud();
   };
 
   const isLastChapter = chapter.index === chapterCount - 1;
 
   return (
     <div
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
+      ref={outerRef}
       onMouseDown={onMouseDown}
-      onMouseMove={onMouseMove}
-      onMouseUp={onMouseUp}
-      onMouseLeave={() => {
-        if (gestureRef.current.active) {
-          gestureRef.current.active = false;
-          setIsDragging(false);
-          setDragX(0);
-        }
-      }}
       onWheel={onWheel}
       onClick={onClick}
-      className="h-full w-full overflow-hidden flex flex-col items-center justify-center px-6 sm:px-10 pt-16 pb-16 select-none touch-pan-y"
+      style={{
+        paddingTop: hudVisible
+          ? 'calc(4rem + env(safe-area-inset-top, 0px))'
+          : 'calc(1.25rem + env(safe-area-inset-top, 0px))',
+        paddingBottom: hudVisible
+          ? 'calc(4rem + env(safe-area-inset-bottom, 0px))'
+          : 'calc(1.25rem + env(safe-area-inset-bottom, 0px))',
+      }}
+      className={`h-full w-full overflow-hidden flex flex-col items-center justify-center px-6 sm:px-10 ${
+        isSelectingText ? 'cursor-text' : isDragging ? 'cursor-grabbing' : ''
+      }`}
     >
-      {/* Centered optimal-width book page viewport */}
+      {/* Centered optimal-width book page viewport — paginated via scrollLeft so text has zero CSS transform when idle */}
       <div
         ref={viewportRef}
-        className="w-full max-w-[660px] h-full overflow-hidden relative"
+        onScroll={(e) => {
+          if (!isDragging && scrollAnimRafRef.current === null && viewportWidth > 0) {
+            const expected = clampedPage * stride;
+            if (Math.abs(e.currentTarget.scrollLeft - expected) > 2) {
+              e.currentTarget.scrollLeft = expected;
+            }
+          }
+        }}
+        className="w-full max-w-[660px] h-full overflow-x-hidden overflow-y-hidden relative no-scrollbar"
       >
         <div
           ref={contentRef}
+          className="select-text"
           style={{
             height: viewportHeight > 0 ? `${viewportHeight}px` : '100%',
             columnWidth: viewportWidth > 0 ? `${viewportWidth}px` : '100%',
             columnGap: `${COLUMN_GAP}px`,
             columnFill: 'auto',
-            transform: `translate3d(${baseTranslate + dragX}px, 0, 0)`,
-            transition: isDragging
-              ? 'none'
-              : 'transform 280ms cubic-bezier(0.22, 1, 0.36, 1)',
-            willChange: 'transform',
+            transform: overscrollX !== 0 ? `translate3d(${overscrollX}px, 0, 0)` : undefined,
+            transition: isDragging ? 'none' : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1)',
           }}
         >
           <header className="mb-5 break-inside-avoid">
@@ -302,7 +699,7 @@ export function SwipeChapterView({
                 backgroundColor: 'var(--reader-surface)',
                 borderColor: 'var(--reader-border)',
               }}
-              className="mt-6 rounded-2xl border p-5 text-center space-y-2.5 break-inside-avoid"
+              className="mt-6 rounded-2xl border p-5 text-center space-y-2.5 break-inside-avoid select-none"
             >
               <CheckCircle2
                 style={{ color: 'var(--reader-accent)' }}
