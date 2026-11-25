@@ -1,13 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { MarkdownContent } from './MarkdownContent';
-import {
-  applyTouchDragSelection,
-  getCaretFromPoint,
-  hasNonEmptySelection,
-  selectWordAtCaret,
-  type CaretPoint,
-} from '../../lib/touchSelection';
+import { hasNonEmptySelection } from '../../lib/touchSelection';
 import type { Chapter, FontSize, ReaderFont } from '../../types/book';
 
 interface ScrollChapterViewProps {
@@ -49,45 +43,34 @@ export function ScrollChapterView({
   onBackToLibrary,
 }: ScrollChapterViewProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const articleRef = useRef<HTMLElement | null>(null);
   const [dragX, setDragX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
 
   const gestureRef = useRef<{
     active: boolean;
+    pointer: 'none' | 'touch' | 'mouse';
     startX: number;
     startY: number;
     lastX: number;
     startTime: number;
     axis: 'none' | 'horizontal' | 'vertical' | 'select';
     moved: boolean;
-    anchorCaret: CaretPoint | null;
-    initialSelectionText: string;
   }>({
     active: false,
+    pointer: 'none',
     startX: 0,
     startY: 0,
     lastX: 0,
     startTime: 0,
     axis: 'none',
     moved: false,
-    anchorCaret: null,
-    initialSelectionText: '',
   });
 
-  const longPressTimerRef = useRef<number | null>(null);
   const hadSelectionAtStartRef = useRef(false);
   const wheelLockRef = useRef<number>(0);
   const initialScrollRatioRef = useRef(initialScrollRatio);
   const lastReportedRatioRef = useRef(-1);
   const scrollRafRef = useRef<number | null>(null);
-
-  const clearLongPressTimer = useCallback(() => {
-    if (longPressTimerRef.current !== null) {
-      window.clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-  }, []);
 
   // Restore scroll position ONLY when switching chapters (never fight active user scrolling)
   useEffect(() => {
@@ -104,12 +87,24 @@ export function ScrollChapterView({
 
   useEffect(() => {
     return () => {
-      clearLongPressTimer();
       if (scrollRafRef.current !== null) {
         cancelAnimationFrame(scrollRafRef.current);
       }
     };
-  }, [clearLongPressTimer]);
+  }, []);
+
+  // Immediately yield touch tracking if native mobile selection activates
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      const g = gestureRef.current;
+      if (g.active && g.pointer === 'touch' && g.axis === 'none' && hasNonEmptySelection()) {
+        g.active = false;
+        g.axis = 'select';
+      }
+    };
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => document.removeEventListener('selectionchange', handleSelectionChange);
+  }, []);
 
   const handleScroll = () => {
     if (scrollRafRef.current !== null) return;
@@ -164,54 +159,39 @@ export function ScrollChapterView({
     }
   }, []);
 
-  // Native touch listeners (`passive: false` on touchmove so multi-word drag selection & horizontal swipe don't fight scroll)
+  // Native touch listeners: yield 100% to mobile OS text selection & teardrop handles
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
 
     const handleTouchStart = (e: TouchEvent) => {
-      clearLongPressTimer();
-      const existingSelText = window.getSelection()?.toString() ?? '';
-      hadSelectionAtStartRef.current = existingSelText.trim().length > 0;
+      hadSelectionAtStartRef.current = hasNonEmptySelection();
 
+      if (hadSelectionAtStartRef.current) {
+        gestureRef.current.active = false;
+        return;
+      }
       if (e.touches.length !== 1) return;
+
       const touch = e.touches[0];
       if (touch.clientX < EDGE_GUARD_PX) return;
       if ((e.target as HTMLElement | null)?.closest('button, a')) return;
 
-      const startX = touch.clientX;
-      const startY = touch.clientY;
-      const anchorCaret = getCaretFromPoint(startX, startY, articleRef.current, true);
-
       gestureRef.current = {
         active: true,
-        startX,
-        startY,
-        lastX: startX,
+        pointer: 'touch',
+        startX: touch.clientX,
+        startY: touch.clientY,
+        lastX: touch.clientX,
         startTime: performance.now(),
         axis: 'none',
         moved: false,
-        anchorCaret,
-        initialSelectionText: existingSelText,
       };
-
-      if (anchorCaret) {
-        longPressTimerRef.current = window.setTimeout(() => {
-          longPressTimerRef.current = null;
-          const g = gestureRef.current;
-          if (g.active && g.axis === 'none') {
-            g.axis = 'select';
-            if (!hasNonEmptySelection()) {
-              selectWordAtCaret(anchorCaret);
-            }
-          }
-        }, LONG_PRESS_MS);
-      }
     };
 
     const handleTouchMove = (e: TouchEvent) => {
       const g = gestureRef.current;
-      if (!g.active || e.touches.length !== 1) return;
+      if (!g.active || g.pointer !== 'touch' || e.touches.length !== 1) return;
 
       const touch = e.touches[0];
       const dx = touch.clientX - g.startX;
@@ -225,50 +205,22 @@ export function ScrollChapterView({
       }
 
       if (g.axis === 'none') {
-        const currentSelText = window.getSelection()?.toString() ?? '';
-        if (
-          hadSelectionAtStartRef.current &&
-          currentSelText.length > 0 &&
-          currentSelText !== g.initialSelectionText
-        ) {
-          clearLongPressTimer();
+        const heldMs = performance.now() - g.startTime;
+        if (hasNonEmptySelection() || heldMs >= LONG_PRESS_MS) {
+          g.axis = 'select';
           g.active = false;
           return;
         }
+        if (absX < DEADZONE_PX && absY < DEADZONE_PX) return;
 
-        const heldMs = performance.now() - g.startTime;
-        const newNativeSelectionStarted =
-          !hadSelectionAtStartRef.current && currentSelText.trim().length > 0;
-
-        if (newNativeSelectionStarted || (heldMs >= LONG_PRESS_MS && g.anchorCaret)) {
-          clearLongPressTimer();
-          g.axis = 'select';
+        if (absX > absY * HORIZONTAL_LOCK_RATIO) {
+          g.axis = 'horizontal';
+          setIsDragging(true);
         } else {
-          if (absX < DEADZONE_PX && absY < DEADZONE_PX) return;
-          clearLongPressTimer();
-          if (absX > absY * HORIZONTAL_LOCK_RATIO) {
-            g.axis = 'horizontal';
-            window.getSelection()?.removeAllRanges();
-            setIsDragging(true);
-          } else {
-            g.axis = 'vertical';
-            return;
-          }
+          g.axis = 'vertical';
+          g.active = false;
+          return;
         }
-      }
-
-      if (g.axis === 'select') {
-        if (!g.anchorCaret) return;
-        if (e.cancelable) e.preventDefault();
-        if (Math.hypot(dx, dy) >= 6) {
-          applyTouchDragSelection(
-            g.anchorCaret,
-            touch.clientX,
-            touch.clientY,
-            articleRef.current
-          );
-        }
-        return;
       }
 
       if (g.axis === 'horizontal') {
@@ -281,9 +233,8 @@ export function ScrollChapterView({
     };
 
     const handleTouchEnd = () => {
-      clearLongPressTimer();
       const g = gestureRef.current;
-      if (!g.active) return;
+      if (!g.active || g.pointer !== 'touch') return;
       g.active = false;
 
       if (g.axis === 'horizontal') {
@@ -291,27 +242,18 @@ export function ScrollChapterView({
       }
     };
 
-    const handleContextMenu = (e: MouseEvent) => {
-      const g = gestureRef.current;
-      if (g.active && (g.moved || window.matchMedia('(any-hover: hover)').matches)) {
-        e.preventDefault();
-      }
-    };
-
     el.addEventListener('touchstart', handleTouchStart, { passive: true });
     el.addEventListener('touchmove', handleTouchMove, { passive: false });
     el.addEventListener('touchend', handleTouchEnd, { passive: true });
     el.addEventListener('touchcancel', handleTouchEnd, { passive: true });
-    el.addEventListener('contextmenu', handleContextMenu);
 
     return () => {
       el.removeEventListener('touchstart', handleTouchStart);
       el.removeEventListener('touchmove', handleTouchMove);
       el.removeEventListener('touchend', handleTouchEnd);
       el.removeEventListener('touchcancel', handleTouchEnd);
-      el.removeEventListener('contextmenu', handleContextMenu);
     };
-  }, [clearLongPressTimer, finishHorizontalGesture]);
+  }, [finishHorizontalGesture]);
 
   // Mouse drag support for desktop horizontal chapter swipe (outside selectable prose)
   const onMouseDown = (e: React.MouseEvent) => {
@@ -321,20 +263,19 @@ export function ScrollChapterView({
     if (target.closest('button, a, .reader-prose, header')) return;
     gestureRef.current = {
       active: true,
+      pointer: 'mouse',
       startX: e.clientX,
       startY: e.clientY,
       lastX: e.clientX,
       startTime: performance.now(),
       axis: 'none',
       moved: false,
-      anchorCaret: null,
-      initialSelectionText: '',
     };
   };
 
   const onMouseMove = (e: React.MouseEvent) => {
     const g = gestureRef.current;
-    if (!g.active) return;
+    if (!g.active || g.pointer !== 'mouse') return;
     const dx = e.clientX - g.startX;
     const dy = e.clientY - g.startY;
     const absX = Math.abs(dx);
@@ -362,7 +303,7 @@ export function ScrollChapterView({
 
   const onMouseUp = (e: React.MouseEvent) => {
     const g = gestureRef.current;
-    if (!g.active) return;
+    if (!g.active || g.pointer !== 'mouse') return;
     g.active = false;
     if (g.axis === 'horizontal') {
       finishHorizontalGesture(e.clientX - g.startX, g.startTime);
@@ -422,7 +363,6 @@ export function ScrollChapterView({
       className="h-full w-full overflow-y-auto overscroll-x-none touch-pan-y"
     >
       <article
-        ref={articleRef}
         style={{
           paddingTop: hudVisible
             ? 'calc(4.5rem + env(safe-area-inset-top, 0px))'

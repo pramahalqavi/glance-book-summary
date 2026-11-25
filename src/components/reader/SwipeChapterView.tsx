@@ -75,7 +75,6 @@ export function SwipeChapterView({
     axis: 'none' | 'horizontal' | 'vertical' | 'select';
     moved: boolean;
     anchorCaret: CaretPoint | null;
-    initialSelectionText: string;
   }>({
     active: false,
     pointer: 'none',
@@ -86,7 +85,6 @@ export function SwipeChapterView({
     axis: 'none',
     moved: false,
     anchorCaret: null,
-    initialSelectionText: '',
   });
 
   const longPressTimerRef = useRef<number | null>(null);
@@ -146,6 +144,8 @@ export function SwipeChapterView({
 
   const clampedPage = Math.max(0, Math.min(pageIndex, pageCount - 1));
   const stride = viewportWidth + COLUMN_GAP;
+  const trackWidth =
+    viewportWidth > 0 ? pageCount * viewportWidth + Math.max(0, pageCount - 1) * COLUMN_GAP : 0;
 
   // Measure viewport & dynamically compute CSS multi-column page count
   const measurePages = useCallback(() => {
@@ -157,6 +157,8 @@ export function SwipeChapterView({
     const h = vp.clientHeight;
     if (w <= 0 || h <= 0) return;
 
+    // Reset explicit width before measuring natural multi-column scrollWidth
+    content.style.width = `${w}px`;
     setViewportWidth(w);
     setViewportHeight(h);
 
@@ -165,9 +167,12 @@ export function SwipeChapterView({
       const contentNow = contentRef.current;
       if (!contentNow || !vpNow) return;
       const cw = vpNow.clientWidth;
+      contentNow.style.width = `${cw}px`;
       const sw = contentNow.scrollWidth;
       const nextStride = cw + COLUMN_GAP;
       const computed = Math.max(1, Math.round((sw + COLUMN_GAP) / nextStride));
+      // Expand contentRef's layout box to cover all columns so mobile hit-testing & selection handles work on Page 2+
+      contentNow.style.width = `${computed * cw + Math.max(0, computed - 1) * COLUMN_GAP}px`;
       setPageCount(computed);
       onPageCountChange(computed);
     });
@@ -207,6 +212,19 @@ export function SwipeChapterView({
       cancelScrollAnim();
     };
   }, [clearLongPressTimer, cancelScrollAnim]);
+
+  // Immediately yield touch swipe tracking if native mobile selection activates
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      const g = gestureRef.current;
+      if (g.active && g.pointer === 'touch' && g.axis === 'none' && hasNonEmptySelection()) {
+        g.active = false;
+        g.axis = 'select';
+      }
+    };
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => document.removeEventListener('selectionchange', handleSelectionChange);
+  }, []);
 
   const goNext = useCallback(() => {
     if (clampedPage < pageCount - 1) {
@@ -313,51 +331,38 @@ export function SwipeChapterView({
     animScroll(curPage * curStride, false);
   }, []);
 
-  // Native touch listeners (`passive: false` on touchmove so multi-word drag selection works smoothly)
+  // Mobile touch listeners:
+  // Never call preventDefault() or mutate Selection on long-press / active selection so
+  // Android Chrome & iOS Safari native teardrop handles, magnifier, and Copy bar work 100% natively.
   useEffect(() => {
     const el = outerRef.current;
     if (!el) return;
 
     const handleTouchStart = (e: TouchEvent) => {
-      clearLongPressTimer();
-      const existingSelText = window.getSelection()?.toString() ?? '';
-      hadSelectionAtStartRef.current = existingSelText.trim().length > 0;
+      hadSelectionAtStartRef.current = hasNonEmptySelection();
 
+      // If text is already selected, stay completely out of the way so native teardrop handles drag freely
+      if (hadSelectionAtStartRef.current) {
+        gestureRef.current.active = false;
+        return;
+      }
       if (e.touches.length !== 1) return;
+
       const touch = e.touches[0];
       if (touch.clientX < EDGE_GUARD_PX) return;
       if ((e.target as HTMLElement | null)?.closest('button, a')) return;
 
-      const startX = touch.clientX;
-      const startY = touch.clientY;
-      const anchorCaret = getCaretFromPoint(startX, startY, contentRef.current, true);
-
       gestureRef.current = {
         active: true,
         pointer: 'touch',
-        startX,
-        startY,
-        lastX: startX,
+        startX: touch.clientX,
+        startY: touch.clientY,
+        lastX: touch.clientX,
         startTime: performance.now(),
         axis: 'none',
         moved: false,
-        anchorCaret,
-        initialSelectionText: existingSelText,
+        anchorCaret: null,
       };
-
-      if (anchorCaret) {
-        longPressTimerRef.current = window.setTimeout(() => {
-          longPressTimerRef.current = null;
-          const g = gestureRef.current;
-          if (g.active && g.pointer === 'touch' && g.axis === 'none') {
-            g.axis = 'select';
-            setIsSelectingText(true);
-            if (!hasNonEmptySelection()) {
-              selectWordAtCaret(anchorCaret);
-            }
-          }
-        }, LONG_PRESS_MS);
-      }
     };
 
     const handleTouchMove = (e: TouchEvent) => {
@@ -376,52 +381,24 @@ export function SwipeChapterView({
       }
 
       if (g.axis === 'none') {
-        const currentSelText = window.getSelection()?.toString() ?? '';
-        if (
-          hadSelectionAtStartRef.current &&
-          currentSelText.length > 0 &&
-          currentSelText !== g.initialSelectionText
-        ) {
-          clearLongPressTimer();
+        const heldMs = performance.now() - g.startTime;
+        // User held still long enough for a long-press or native selection started -> yield 100% to OS
+        if (hasNonEmptySelection() || heldMs >= LONG_PRESS_MS) {
+          g.axis = 'select';
           g.active = false;
           return;
         }
+        if (absX < DEADZONE_PX && absY < DEADZONE_PX) return;
 
-        const heldMs = performance.now() - g.startTime;
-        const newNativeSelectionStarted =
-          !hadSelectionAtStartRef.current && currentSelText.trim().length > 0;
-
-        if (newNativeSelectionStarted || (heldMs >= LONG_PRESS_MS && g.anchorCaret)) {
-          clearLongPressTimer();
-          g.axis = 'select';
-          setIsSelectingText(true);
+        if (absX > absY * HORIZONTAL_LOCK_RATIO) {
+          g.axis = 'horizontal';
+          cancelScrollAnim();
+          setIsDragging(true);
         } else {
-          if (absX < DEADZONE_PX && absY < DEADZONE_PX) return;
-          clearLongPressTimer();
-          if (absX > absY * HORIZONTAL_LOCK_RATIO) {
-            g.axis = 'horizontal';
-            cancelScrollAnim();
-            window.getSelection()?.removeAllRanges();
-            setIsDragging(true);
-          } else {
-            g.axis = 'vertical';
-            return;
-          }
+          g.axis = 'vertical';
+          g.active = false;
+          return;
         }
-      }
-
-      if (g.axis === 'select') {
-        if (!g.anchorCaret) return;
-        if (e.cancelable) e.preventDefault();
-        if (Math.hypot(dx, dy) >= 6) {
-          applyTouchDragSelection(
-            g.anchorCaret,
-            touch.clientX,
-            touch.clientY,
-            contentRef.current
-          );
-        }
-        return;
       }
 
       if (g.axis === 'horizontal') {
@@ -431,25 +408,12 @@ export function SwipeChapterView({
     };
 
     const handleTouchEnd = () => {
-      clearLongPressTimer();
       const g = gestureRef.current;
       if (!g.active || g.pointer !== 'touch') return;
       g.active = false;
-      setIsSelectingText(false);
 
       if (g.axis === 'horizontal') {
         finishSwipe(g.lastX - g.startX, g.startTime);
-      }
-    };
-
-    const handleContextMenu = (e: MouseEvent) => {
-      const g = gestureRef.current;
-      if (
-        g.active &&
-        g.pointer === 'touch' &&
-        (g.moved || window.matchMedia('(any-hover: hover)').matches)
-      ) {
-        e.preventDefault();
       }
     };
 
@@ -457,18 +421,16 @@ export function SwipeChapterView({
     el.addEventListener('touchmove', handleTouchMove, { passive: false });
     el.addEventListener('touchend', handleTouchEnd, { passive: true });
     el.addEventListener('touchcancel', handleTouchEnd, { passive: true });
-    el.addEventListener('contextmenu', handleContextMenu);
 
     return () => {
       el.removeEventListener('touchstart', handleTouchStart);
       el.removeEventListener('touchmove', handleTouchMove);
       el.removeEventListener('touchend', handleTouchEnd);
       el.removeEventListener('touchcancel', handleTouchEnd);
-      el.removeEventListener('contextmenu', handleContextMenu);
     };
-  }, [clearLongPressTimer, cancelScrollAnim, applyHorizontalDrag, finishSwipe]);
+  }, [cancelScrollAnim, applyHorizontalDrag, finishSwipe]);
 
-  // Desktop mouse gesture: matches mobile behavior!
+  // Desktop mouse gesture:
   // Quick click-and-drag (< 260ms) anywhere swipes the page;
   // Long-press hold (>= 260ms) + drag on text selects words/lines smoothly.
   const onMouseDown = (e: React.MouseEvent) => {
@@ -508,7 +470,6 @@ export function SwipeChapterView({
       axis: 'none',
       moved: false,
       anchorCaret,
-      initialSelectionText: '',
     };
 
     if (anchorCaret) {
@@ -664,6 +625,7 @@ export function SwipeChapterView({
           ref={contentRef}
           className="select-text"
           style={{
+            width: trackWidth > 0 ? `${trackWidth}px` : '100%',
             height: viewportHeight > 0 ? `${viewportHeight}px` : '100%',
             columnWidth: viewportWidth > 0 ? `${viewportWidth}px` : '100%',
             columnGap: `${COLUMN_GAP}px`,
